@@ -84,6 +84,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'a':
                 // Set Alice's private key if provided
+                // Formatted in length of 32 bytes (hexadecimal)
                 if (sscanf(optarg, "%32hhx", alice_private) != 1) {
                     printf("Invalid input for Alice's private key.\n");
                     return 1;
@@ -112,6 +113,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // For Debugging
+    // Print the private keys:
+    printf(alice_private);
+    printf(bob_private);
+
     // Generate Alice's private key randomly if not provided.
     if (alice_private[0] == 0) {
         randombytes_buf(alice_private, sizeof(alice_private));
@@ -133,16 +139,17 @@ int main(int argc, char *argv[]) {
     // For Debugging purposes.
 	// Calculate Alice's shared secret
 	if (crypto_scalarmult(alice_shared_secret, alice_private, bob_public) != 0) {
-		printf("Error: Failed to calculate Alice's shared secret.\n");
+		printf("Failed to calculate Alice's shared secret.\n");
 		return 1;
 	}
 	// Calculate Bob's shared secret
 	if (crypto_scalarmult(bob_shared_secret, bob_private, alice_public) != 0) {
-		printf("Error: Failed to calculate Bob's shared secret.\n");
+		printf("Failed to calculate Bob's shared secret.\n");
 		return 1;
 	}
 
     // Verify that shared secrets match
+    // Using memcmp since we're dealing with unsigned char data type.
     if (memcmp(alice_shared_secret, bob_shared_secret, KEY_SIZE) != 0) {
         printf("Error: Shared secrets do not match!\n");
         return 1;
