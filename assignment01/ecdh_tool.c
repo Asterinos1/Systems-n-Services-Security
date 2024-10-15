@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Check if the output file is provided (mandatory option)
+    // Check if the output file is provided
     if (output_file == NULL) {
         fprintf(stderr, "Error: Output file is required.\n");
         print_help();
@@ -122,30 +122,29 @@ int main(int argc, char *argv[]) {
         randombytes_buf(bob_private, sizeof(bob_private));
     }
 
-    // Generate public keys
-    crypto_scalarmult_base(alice_public, alice_private);
-    crypto_scalarmult_base(bob_public, bob_private);
+    // Generate public keys 
+    crypto_scalarmult_base(alice_public, alice_private); // alice_public = alice_private * G
+    crypto_scalarmult_base(bob_public, bob_private);    // bob_public = bob_private * G
 
     // Calculate shared secrets
 	unsigned char alice_shared_secret[KEY_SIZE];
 	unsigned char bob_shared_secret[KEY_SIZE];
 
+    // For Debugging purposes.
 	// Calculate Alice's shared secret
 	if (crypto_scalarmult(alice_shared_secret, alice_private, bob_public) != 0) {
-		fprintf(stderr, "Error: Failed to calculate Alice's shared secret.\n");
+		printf("Error: Failed to calculate Alice's shared secret.\n");
 		return 1;
 	}
-
 	// Calculate Bob's shared secret
 	if (crypto_scalarmult(bob_shared_secret, bob_private, alice_public) != 0) {
-		fprintf(stderr, "Error: Failed to calculate Bob's shared secret.\n");
+		printf("Error: Failed to calculate Bob's shared secret.\n");
 		return 1;
 	}
-
 
     // Verify that shared secrets match
     if (memcmp(alice_shared_secret, bob_shared_secret, KEY_SIZE) != 0) {
-        fprintf(stderr, "Error: Shared secrets do not match!\n");
+        printf("Error: Shared secrets do not match!\n");
         return 1;
     }
 
