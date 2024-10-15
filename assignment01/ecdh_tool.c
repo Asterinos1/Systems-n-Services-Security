@@ -13,10 +13,10 @@
 // Function to display the help message
 void print_help() {
     printf("Command Line Options for ECDH Tool:\n");
-    printf("-o path      Path to output file\n");
-    printf("-a number    Alice's private key (optional)\n");
-    printf("-b number    Bob's private key (optional)\n");
-    printf("-h           This help message\n");
+    printf("\t-o path      Path to output file\n");
+    printf("\t-a number    Alice's private key (optional)\n");
+    printf("\t-b number    Bob's private key (optional)\n");
+    printf("\t-h           This help message\n");
 }
 
 // Function to write keys and shared secret to the output file
