@@ -51,6 +51,7 @@ void create_file(const char *filename, const unsigned char *alice_pub, const uns
         fprintf(file, "%02x", shared_secret[i]);
     }
     fprintf(file, "\n");
+    fprintf(file, "Shared secrets match!");
 
     fclose(file);
 
@@ -115,8 +116,8 @@ int main(int argc, char *argv[]) {
 
     // For Debugging
     // Print the private keys:
-    printf(alice_private);
-    printf(bob_private);
+    // printf(alice_private);
+    // printf(bob_private);
 
     // Generate Alice's private key randomly if not provided.
     if (alice_private[0] == 0) {
