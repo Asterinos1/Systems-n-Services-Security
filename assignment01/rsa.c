@@ -32,51 +32,52 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     mpz_t n, lambda_n, e, d, gcd;
     gmp_randstate_t state;
 
-    // Initialize GMP integers
+    /*Initiliazation*/
     mpz_init(n);
     mpz_init(lambda_n);
     mpz_init(e);
     mpz_init(d);
     mpz_init(gcd);
 
-    // Compute n = p * q
-    mpz_mul(n, p, q);
+    mpz_mul(n, p, q);  //n = p * q
 
-    // Compute lambda(n) = lcm(p-1, q-1)
     mpz_t p_minus_1, q_minus_1;
     mpz_init(p_minus_1);
     mpz_init(q_minus_1);
 
-    mpz_sub_ui(p_minus_1, p, 1);
-    mpz_sub_ui(q_minus_1, q, 1);
-    mpz_mul(lambda_n, p_minus_1, q_minus_1);
+    mpz_sub_ui(p_minus_1, p, 1); //(p-1)
+    mpz_sub_ui(q_minus_1, q, 1); //(q-1)
+    mpz_mul(lambda_n, p_minus_1, q_minus_1); //(p-1)*(q-1)
 
     mpz_t reminder;
     mpz_init(reminder);
-    mpz_set_ui(e,2);
+    mpz_set_ui(e,65537); //e=65537 (to diabasa se ena site)
 
+    //find a suitable e
     do
     {   
         mpz_mod(reminder,e,lambda_n);
         mpz_gcd(gcd,e,lambda_n);
-        if(mpz_probab_prime_p(e,20)>0 && mpz_cmp_d(reminder,0) !=0 && mpz_cmp_d(gcd,1) == 0) {
+        if(mpz_probab_prime_p(e,1000)>0 && mpz_cmp_d(reminder,0) !=0 && mpz_cmp_d(gcd,1) == 0) {
             break;
         }
         mpz_add_ui(e,e,1);
     } while (1);
-    
-    // Compute d, the modular inverse of e mod lambda(n)
+
+    //find d 
     mpz_invert(d, e, lambda_n);
 
-    // Output the key pair (n, e) is public, (n, d) is private
-    gmp_printf("Public key: \n n: %Zd\n d: %Zd\n", n, d);
-    gmp_printf("Private key: \n n: %Zd\n e: %Zd\n", n, e);
+    //testing delete later
+    gmp_printf("Public key: \n n: %Zd\n d: %Zd\n", n, e);
+    gmp_printf("Private key: \n n: %Zd\n e: %Zd\n", n, d);
 
+    //write public and private key to the files
     FILE *pub_key_file = fopen("public.key", "w");
     FILE *priv_key_file = fopen("private.key", "w");
-    gmp_fprintf(pub_key_file, "%Zd %Zd", n, d);
-    gmp_fprintf(priv_key_file, "%Zd %Zd", n, e);
+    gmp_fprintf(pub_key_file, "%Zd %Zd", n, e);
+    gmp_fprintf(priv_key_file, "%Zd %Zd", n, d);
 
+    //close files
     fclose(pub_key_file);
     fclose(priv_key_file);
 
@@ -84,6 +85,55 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     // Clear memory
     mpz_clears(n, lambda_n, e, d, gcd, p_minus_1, q_minus_1, NULL);
     mpz_clear(reminder);
+}
+
+
+void rsa_encrypt(const char* input_file, const char* output_file, const char* pub_key_file) {
+    mpz_t n, e, plaintext, ciphertext;
+    mpz_inits(n, e, plaintext, ciphertext, NULL);
+
+    //read public key from file
+    FILE *pub_key = fopen(pub_key_file, "r");
+    gmp_fscanf(pub_key, "%Zd %Zd", n, e);
+    fclose(pub_key);
+
+    //read plaintext from input file
+    FILE *input = fopen(input_file, "r");
+    gmp_fscanf(input, "%Zd", plaintext);
+    fclose(input);
+
+    mpz_powm(ciphertext, plaintext, e, n); //ciphertext = plaintext^e mod n
+
+    FILE *output = fopen(output_file, "w");
+    gmp_fprintf(output, "%Zd", ciphertext);
+    fclose(output);
+
+    mpz_clears(n, e, plaintext, ciphertext, NULL);
+}
+
+
+void rsa_decrypt(const char* input_file, const char* output_file, const char* priv_key_file) {
+    mpz_t n, d, plaintext, ciphertext;
+    mpz_inits(n, d, plaintext, ciphertext, NULL);
+
+
+    FILE *priv_key = fopen(priv_key_file, "r");
+    gmp_fscanf(priv_key, "%Zd %Zd", n, d);
+    fclose(priv_key);
+
+    FILE *input = fopen(input_file, "r");
+    gmp_fscanf(input, "%Zd", ciphertext);
+    fclose(input);
+
+    
+    mpz_powm(plaintext, ciphertext, d, n); //plaintext = ciphertext^d mod n
+
+    FILE *output = fopen(output_file, "w");
+    gmp_fprintf(output, "%Zd", plaintext);
+    fclose(output);
+
+    // Clear memory
+    mpz_clears(n, d, plaintext, ciphertext, NULL);
 }
 
 void print_help() {
@@ -105,7 +155,6 @@ int main(int argc, char *argv[]) {
     char *input_file = NULL, *output_file = NULL, *key_file = NULL;
     int generate = 0, encrypt = 0, decrypt = 0, analyze = 0;
 
-    // Argument parsing loop
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0) {
             print_help();
@@ -159,10 +208,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Perform actions based on flags
     if (generate) {
         printf("Generating RSA keys of length %d...\n", key_length);
-        // Your RSA key generation logic here
         mpz_t p; 
         mpz_init(p);
         mpz_t q;
@@ -174,16 +221,18 @@ int main(int argc, char *argv[]) {
     } 
     else if (encrypt) {
         printf("Encrypting input file %s using key file %s...\n", input_file, key_file);
-        // Your encryption logic here
+        rsa_encrypt(input_file,output_file, key_file);
     } 
     else if (decrypt) {
         printf("Decrypting input file %s using key file %s...\n", input_file, key_file);
-        // Your decryption logic here
+        rsa_decrypt(input_file,output_file,key_file);
     } 
     else if (analyze) {
         printf("Analyzing RSA performance...\n");
-        // Your analysis logic here
+        //auto menei akoma
     }
+
+
 
     return 0;
 }
