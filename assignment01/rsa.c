@@ -5,6 +5,8 @@
 #include <string.h>
 #include <time.h>
 
+#define SIZE_OF_CIPHER_BYTE 256
+
 void generatePrime(int length, mpz_t p, mpz_t q){
     gmp_printf("Primes: \n 1: %Zd\n 2: %Zd\n", p, q);
     printf("Length/2: %d\n", length );
@@ -68,8 +70,8 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     mpz_invert(d, e, lambda_n);
 
     //testing delete later
-    gmp_printf("Public key: \n n: %Zd\n d: %Zd\n", n, e);
-    gmp_printf("Private key: \n n: %Zd\n e: %Zd\n", n, d);
+    gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
+    gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
 
     //write public and private key to the files
     FILE *pub_key_file = fopen("public.key", "w");
@@ -87,53 +89,71 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     mpz_clear(reminder);
 }
 
-
 void rsa_encrypt(const char* input_file, const char* output_file, const char* pub_key_file) {
-    mpz_t n, e, plaintext, ciphertext;
-    mpz_inits(n, e, plaintext, ciphertext, NULL);
-
+    mpz_t n, e, plaintext, gmp_letter, cipherletter;
+    mpz_inits(n, e, plaintext,cipherletter,gmp_letter, NULL);
+    long *temp =  (long*) malloc(SIZE_OF_CIPHER_BYTE); 
+    
     //read public key from file
     FILE *pub_key = fopen(pub_key_file, "r");
+    
+
     gmp_fscanf(pub_key, "%Zd %Zd", n, e);
     fclose(pub_key);
 
-    //read plaintext from input file
     FILE *input = fopen(input_file, "r");
-    gmp_fscanf(input, "%Zd", plaintext);
+    FILE *output = fopen(output_file, "w");
+
+    int letter;
+    while ((letter=fgetc(input)) != EOF) { 
+            mpz_set_ui(gmp_letter, letter);
+            mpz_powm(cipherletter, gmp_letter, e, n); 
+
+            mpz_export(temp, NULL, 0, SIZE_OF_CIPHER_BYTE, 0, 0, cipherletter);
+            fwrite(temp, SIZE_OF_CIPHER_BYTE, 1, output);
+        }
+
     fclose(input);
 
-    mpz_powm(ciphertext, plaintext, e, n); //ciphertext = plaintext^e mod n
-
-    FILE *output = fopen(output_file, "w");
-    gmp_fprintf(output, "%Zd", ciphertext);
     fclose(output);
 
-    mpz_clears(n, e, plaintext, ciphertext, NULL);
+    mpz_clears(n, e, plaintext, gmp_letter, cipherletter, NULL);
+    free(temp);
 }
 
 
-void rsa_decrypt(const char* input_file, const char* output_file, const char* priv_key_file) {
-    mpz_t n, d, plaintext, ciphertext;
-    mpz_inits(n, d, plaintext, ciphertext, NULL);
+void rsa_decrypt(char *infile_name, char *outfile_name, char *keyfile_name){
+        FILE *keyfile = fopen(keyfile_name, "r");
+        mpz_t n, d;
+        mpz_init(n);
+        mpz_init(d);
+        gmp_fscanf(keyfile, "%Zd %Zd", n, d);
+        
+        mpz_t plain_text, desypher_text;
+        mpz_init(plain_text);
+        mpz_init(desypher_text);
+        long *temp =  (long*) malloc(SIZE_OF_CIPHER_BYTE);
+        int *c = (int*) malloc(sizeof(int));  
 
+        FILE *input = fopen(infile_name, "r");
+        FILE *output = fopen(outfile_name, "w");
 
-    FILE *priv_key = fopen(priv_key_file, "r");
-    gmp_fscanf(priv_key, "%Zd %Zd", n, d);
-    fclose(priv_key);
+        while (fread(temp, SIZE_OF_CIPHER_BYTE, 1, input) != 0) {
 
-    FILE *input = fopen(input_file, "r");
-    gmp_fscanf(input, "%Zd", ciphertext);
-    fclose(input);
+            mpz_import (plain_text, 1, 0, SIZE_OF_CIPHER_BYTE, 0, 0, temp);
+            mpz_powm(desypher_text, plain_text, d, n); 
 
-    
-    mpz_powm(plaintext, ciphertext, d, n); //plaintext = ciphertext^d mod n
+            mpz_export(c, NULL, 0, sizeof(int), 0, 0, desypher_text);
+            fputc((char)*c, output);
+        }
 
-    FILE *output = fopen(output_file, "w");
-    gmp_fprintf(output, "%Zd", plaintext);
-    fclose(output);
+        mpz_clears(n, d, plain_text, desypher_text, NULL);
+        fclose(input);
+        fclose(output);
+        fclose(keyfile);
+        free(c);
+        free(temp);
 
-    // Clear memory
-    mpz_clears(n, d, plaintext, ciphertext, NULL);
 }
 
 void print_help() {
@@ -221,15 +241,64 @@ int main(int argc, char *argv[]) {
     } 
     else if (encrypt) {
         printf("Encrypting input file %s using key file %s...\n", input_file, key_file);
+
         rsa_encrypt(input_file,output_file, key_file);
     } 
     else if (decrypt) {
         printf("Decrypting input file %s using key file %s...\n", input_file, key_file);
-        rsa_decrypt(input_file,output_file,key_file);
+        rsa_decrypt(input_file,output_file, key_file);
+
     } 
     else if (analyze) {
         printf("Analyzing RSA performance...\n");
-        //auto menei akoma
+        mpz_t p1024; 
+        mpz_init(p1024);
+        mpz_t q1024;
+        mpz_init(q1024);
+
+        mpz_t p2048; 
+        mpz_init(p2048);
+        mpz_t q2048;
+        mpz_init(q2048);
+
+        mpz_t p4096; 
+        mpz_init(p4096);
+        mpz_t q4096;
+        mpz_init(q4096);
+        /*
+        generatePrime(1024/2, p1024, q1024);
+        generateRSAKeyPairForPerformance(1024, p1024, q1024, "public_1024.key", "private_1024.key");
+
+        generatePrime(2048/2, p2048, q2048);
+        generateRSAKeyPairForPerformance(2048, p2048, q2048, "public_2048.key", "private_2048.key");
+
+        generatePrime(4096/2, p4096, q4096);
+        generateRSAKeyPairForPerformance(4096, p4096, q4096, "public_4096.key", "private_4096.key");
+
+        double start_encrypt_1024 = get_time_in_seconds();
+        rsa_encrypt(input_file, "outputperfomance.txt", "public_1024.key");
+        double encryption_time1024 = get_time_in_seconds() - start_encrypt_1024;
+
+        double start_decrypt_1024 = get_time_in_seconds();
+        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_1024.key");
+        double decryption_time1024 = get_time_in_seconds() - start_decrypt_1024;
+
+        double start_encrypt_2048 = get_time_in_seconds();
+        rsa_encrypt(input_file, "outputperfomance.txt", "public_2048.key");
+        double encryption_time2048 = get_time_in_seconds() - start_encrypt_2048;
+
+        double start_decrypt_2048 = get_time_in_seconds();
+        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_2048.key");
+        double decryption_time_2048 = get_time_in_seconds() - start_decrypt_2048;
+
+        double start_encrypt_4096= get_time_in_seconds();
+        rsa_encrypt(input_file, "outputperfomance.txt", "public_2048.key");
+        double encryption_time_4096 = get_time_in_seconds() - start_encrypt_4096;
+
+        double start_decrypt_4096 = get_time_in_seconds();
+        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_4096.key");
+        double decryption_time_4096 = get_time_in_seconds() - start_decrypt_4096;
+*/
     }
 
 
