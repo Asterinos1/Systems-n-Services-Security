@@ -52,3 +52,30 @@ Part2:
 		different key lengths (1024, 2048, 4096 key lengths) in terms of computational time.
 		-h This help message
 	
+	First you have to generate keys with a given length './rsa_assign_1 -g 1024'
+	
+	Then specify input/output files with -i/-o accordignly.
+	
+	Finaly select between -e (encryption) or -d (decryption) for example
+	'./rsa_assign_1 -e -i "plaintext.txt" -o "en_output.txt" -k "public.key"
+	This will encrypt plaintext.txt and the ciphered text will be saved in en_output.txt
+	To decipher, do type './rsa_assign_1 -d -i "en_output.txt" -o "de_output.txt" -k "private.key"
+	
+	If cipher is done using public key, use private to decipher and vice versa.
+	
+		For generation of keys (-g) we declare mpz_t variables of the GMP library and initialize them with mpz_init.
+	Then, we create a state for random number generation and we initialize it with the seed being the local time.
+	Then using we random numbers with mpz_urandomb() and get the next prime of them using mpz_nextprime()
+	Then we check if both numbers are prime with the if statement and finaly clear the state.
+	
+		Then we can proceed to key generation with using the prime numbers and following the steps of the algorithm.
+	We initialize the necessary variables and proceed with the correspodning operations (mpz_mul, mpz_sub_ui)
+	We set e to 65537. Keys are stored in public.key and private.key files (-g).
+	
+		Encryption/Decryption functions work similary. First we check the files for the keys and then  perform
+	the mod operation to encrypt/decrypt (mpz_mod).
+	
+		Regarding the performance operation (-a) there was a modification done to the original key generation function
+	that stores the keys accroding to their length.
+	
+	
