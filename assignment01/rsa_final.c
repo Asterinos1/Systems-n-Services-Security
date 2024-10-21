@@ -117,7 +117,7 @@ void generateRSAKeyPairSpecial(int key_length, mpz_t p, mpz_t q){
 
     mpz_t reminder;
     mpz_init(reminder);
-    mpz_set_ui(e,65537); //e=65537 (to diabasa se ena site)
+    mpz_set_ui(e,65537); //e=65537 
 
     //find a suitable e
     do
