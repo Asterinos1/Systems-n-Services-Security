@@ -5,11 +5,15 @@
 #include <string.h>
 #include <time.h>
 
+// new libraries
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #define SIZE_OF_CIPHER_BYTE 256
 
 void generatePrime(int length, mpz_t p, mpz_t q){
-    gmp_printf("Primes: \n 1: %Zd\n 2: %Zd\n", p, q);
-    printf("Length/2: %d\n", length );
+    //gmp_printf("Primes: \n 1: %Zd\n 2: %Zd\n", p, q);
+    //printf("Length/2: %d\n", length );
 
     gmp_randstate_t state;
     gmp_randinit_default(state);
@@ -23,7 +27,7 @@ void generatePrime(int length, mpz_t p, mpz_t q){
     if(!(mpz_probab_prime_p(p,1000)>0 && (mpz_probab_prime_p(q,1000)>0))){
         generatePrime(length,p,q);
     }
-    gmp_printf("Primes after: \n 1: %Zd\n 2: %Zd\n", p, q);
+    //gmp_printf("Primes after: \n 1: %Zd\n 2: %Zd\n", p, q);
 
     gmp_randclear(state);
 }
@@ -76,6 +80,72 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     //write public and private key to the files
     FILE *pub_key_file = fopen("public.key", "w");
     FILE *priv_key_file = fopen("private.key", "w");
+    gmp_fprintf(pub_key_file, "%Zd %Zd", n, e);
+    gmp_fprintf(priv_key_file, "%Zd %Zd", n, d);
+
+    //close files
+    fclose(pub_key_file);
+    fclose(priv_key_file);
+
+
+    // Clear memory
+    mpz_clears(n, lambda_n, e, d, gcd, p_minus_1, q_minus_1, NULL);
+    mpz_clear(reminder);
+}
+
+void generateRSAKeyPairSpecial(int key_length, mpz_t p, mpz_t q){
+    gmp_printf("Primes after generateRSAKeyPairSpecial: \n 1: %Zd\n 2: %Zd\n", p, q);
+    mpz_t n, lambda_n, e, d, gcd;
+    gmp_randstate_t state;
+
+    /*Initiliazation*/
+    mpz_init(n);
+    mpz_init(lambda_n);
+    mpz_init(e);
+    mpz_init(d);
+    mpz_init(gcd);
+
+    mpz_mul(n, p, q);  //n = p * q
+
+    mpz_t p_minus_1, q_minus_1;
+    mpz_init(p_minus_1);
+    mpz_init(q_minus_1);
+
+    mpz_sub_ui(p_minus_1, p, 1); //(p-1)
+    mpz_sub_ui(q_minus_1, q, 1); //(q-1)
+    mpz_mul(lambda_n, p_minus_1, q_minus_1); //(p-1)*(q-1)
+
+    mpz_t reminder;
+    mpz_init(reminder);
+    mpz_set_ui(e,65537); //e=65537 (to diabasa se ena site)
+
+    //find a suitable e
+    do
+    {   
+        mpz_mod(reminder,e,lambda_n);
+        mpz_gcd(gcd,e,lambda_n);
+        if(mpz_probab_prime_p(e,1000)>0 && mpz_cmp_d(reminder,0) !=0 && mpz_cmp_d(gcd,1) == 0) {
+            break;
+        }
+        mpz_add_ui(e,e,1);
+    } while (1);
+
+    //find d 
+    mpz_invert(d, e, lambda_n);
+
+    //testing delete later
+    //gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
+    //gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
+
+	//New for approriate file naming.
+	// Create file names based on key length
+	char pub_key_filename[50], priv_key_filename[50];
+	snprintf(pub_key_filename, sizeof(pub_key_filename), "public_%d.key", key_length);
+	snprintf(priv_key_filename, sizeof(priv_key_filename), "private_%d.key", key_length);
+
+	// Write public and private key to the files
+	FILE *pub_key_file = fopen(pub_key_filename, "w");
+	FILE *priv_key_file = fopen(priv_key_filename, "w");
     gmp_fprintf(pub_key_file, "%Zd %Zd", n, e);
     gmp_fprintf(priv_key_file, "%Zd %Zd", n, d);
 
@@ -170,10 +240,27 @@ void print_help() {
                 "-h This help message\n\n");
 }
 
+
+// Printing stats
+void printResourceUsage() {
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+
+    printf("Resource Usage:\n");
+    printf("User CPU time used: %ld.%06ld seconds\n",
+           (long)usage.ru_utime.tv_sec, (long)usage.ru_utime.tv_usec);
+    printf("System CPU time used: %ld.%06ld seconds\n",
+           (long)usage.ru_stime.tv_sec, (long)usage.ru_stime.tv_usec);
+    printf("Max resident set size: %ld KB\n", usage.ru_maxrss);
+    printf("Page faults: %ld\n", usage.ru_majflt + usage.ru_minflt);
+}
+
+
 int main(int argc, char *argv[]) {
     int key_length = 0;
     char *input_file = NULL, *output_file = NULL, *key_file = NULL;
     int generate = 0, encrypt = 0, decrypt = 0, analyze = 0;
+	char *performance_file = NULL; // Variable for performance filename
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0) {
@@ -220,7 +307,13 @@ int main(int argc, char *argv[]) {
             decrypt = 1;
         } 
         else if (strcmp(argv[i], "-a") == 0) {
-            analyze = 1;
+            if (i + 1 < argc) {
+                performance_file = argv[++i]; // Store the performance filename
+                analyze = 1;
+            } else {
+                fprintf(stderr, "Error: Missing performance file after -a\n");
+                return 1;
+            }
         } 
         else {
             fprintf(stderr, "Error: Unknown option %s\n", argv[i]);
@@ -249,59 +342,121 @@ int main(int argc, char *argv[]) {
         rsa_decrypt(input_file,output_file, key_file);
 
     } 
+	
     else if (analyze) {
-        printf("Analyzing RSA performance...\n");
-        mpz_t p1024; 
-        mpz_init(p1024);
-        mpz_t q1024;
-        mpz_init(q1024);
 
-        mpz_t p2048; 
-        mpz_init(p2048);
-        mpz_t q2048;
-        mpz_init(q2048);
+		printf("Analyzing RSA performance, results will be saved to %s...\n", performance_file);
+    
+		struct timeval start_time, end_time;
 
-        mpz_t p4096; 
-        mpz_init(p4096);
-        mpz_t q4096;
-        mpz_init(q4096);
-        /*
-        generatePrime(1024/2, p1024, q1024);
-        generateRSAKeyPairForPerformance(1024, p1024, q1024, "public_1024.key", "private_1024.key");
+		// Timing for 1024-bit RSA
+		gettimeofday(&start_time, NULL);
+		int length = 1024;
+		mpz_t p1024; 
+		mpz_init(p1024);
+		mpz_t q1024; 
+		mpz_init(q1024);
 
-        generatePrime(2048/2, p2048, q2048);
-        generateRSAKeyPairForPerformance(2048, p2048, q2048, "public_2048.key", "private_2048.key");
+		generatePrime(length/2, p1024, q1024);
+		generateRSAKeyPairSpecial(length, p1024, q1024);
 
-        generatePrime(4096/2, p4096, q4096);
-        generateRSAKeyPairForPerformance(4096, p4096, q4096, "public_4096.key", "private_4096.key");
+		// Measure encryption time
+		gettimeofday(&start_time, NULL);
+		rsa_encrypt("plaintext.txt", "cipherplaintext.txt", "public_1024.key");
+		gettimeofday(&end_time, NULL);
+		double encrypt_time_1024 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
-        double start_encrypt_1024 = get_time_in_seconds();
-        rsa_encrypt(input_file, "outputperfomance.txt", "public_1024.key");
-        double encryption_time1024 = get_time_in_seconds() - start_encrypt_1024;
+		// Measure decryption time
+		gettimeofday(&start_time, NULL);
+		rsa_decrypt("cipherplaintext.txt", "decipherplaintext.txt", "private_1024.key");
+		gettimeofday(&end_time, NULL);
+		double decrypt_time_1024 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
-        double start_decrypt_1024 = get_time_in_seconds();
-        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_1024.key");
-        double decryption_time1024 = get_time_in_seconds() - start_decrypt_1024;
+		printf("Key Length: %d bits\n", length);
+		printf("Encryption Time: %.2fs\n", encrypt_time_1024);
+		printf("Decryption Time: %.2fs\n", decrypt_time_1024);
+		
+		// Print peak memory usage for 1024-bit (example values, replace with actual measurements)
+		printf("Peak Memory Usage (Encryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
+		printf("Peak Memory Usage (Decryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
 
-        double start_encrypt_2048 = get_time_in_seconds();
-        rsa_encrypt(input_file, "outputperfomance.txt", "public_2048.key");
-        double encryption_time2048 = get_time_in_seconds() - start_encrypt_2048;
+		mpz_clear(p1024);
+		mpz_clear(q1024);
 
-        double start_decrypt_2048 = get_time_in_seconds();
-        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_2048.key");
-        double decryption_time_2048 = get_time_in_seconds() - start_decrypt_2048;
+		// Timing for 2048-bit RSA
+		length = 2048;
+		mpz_t p2048; 
+		mpz_init(p2048);
+		mpz_t q2048; 
+		mpz_init(q2048);
 
-        double start_encrypt_4096= get_time_in_seconds();
-        rsa_encrypt(input_file, "outputperfomance.txt", "public_2048.key");
-        double encryption_time_4096 = get_time_in_seconds() - start_encrypt_4096;
+		gettimeofday(&start_time, NULL);
+		generatePrime(length/2, p2048, q2048);
+		generateRSAKeyPairSpecial(length, p2048, q2048);
 
-        double start_decrypt_4096 = get_time_in_seconds();
-        rsa_decrypt("outputperfomance.txt", "performance.txt", "private_4096.key");
-        double decryption_time_4096 = get_time_in_seconds() - start_decrypt_4096;
-*/
+		// Measure encryption time
+		gettimeofday(&start_time, NULL);
+		rsa_encrypt("plaintext.txt", "cipherplaintext_2048.txt", "public_2048.key");
+		gettimeofday(&end_time, NULL);
+		double encrypt_time_2048 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
+		// Measure decryption time
+		gettimeofday(&start_time, NULL);
+		rsa_decrypt("cipherplaintext_2048.txt", "decipherplaintext_2048.txt", "private_2048.key");
+		gettimeofday(&end_time, NULL);
+		double decrypt_time_2048 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
+		printf("Key Length: %d bits\n", length);
+		printf("Encryption Time: %.2fs\n", encrypt_time_2048);
+		printf("Decryption Time: %.2fs\n", decrypt_time_2048);
+		
+		// Print peak memory usage for 2048-bit (example values, replace with actual measurements)
+		printf("Peak Memory Usage (Encryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
+		printf("Peak Memory Usage (Decryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
+
+		mpz_clear(p2048);
+		mpz_clear(q2048);
+
+		// Timing for 4096-bit RSA
+		length = 4096;
+		mpz_t p4096; 
+		mpz_init(p4096);
+		mpz_t q4096; 
+		mpz_init(q4096);
+
+		gettimeofday(&start_time, NULL);
+		generatePrime(length/2, p4096, q4096);
+		generateRSAKeyPairSpecial(length, p4096, q4096);
+
+		// Measure encryption time
+		gettimeofday(&start_time, NULL);
+		rsa_encrypt("plaintext.txt", "cipherplaintext_4096.txt", "public_4096.key");
+		gettimeofday(&end_time, NULL);
+		double encrypt_time_4096 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
+		// Measure decryption time
+		gettimeofday(&start_time, NULL);
+		rsa_decrypt("cipherplaintext_4096.txt", "decipherplaintext_4096.txt", "private_4096.key");
+		gettimeofday(&end_time, NULL);
+		double decrypt_time_4096 = (end_time.tv_sec - start_time.tv_sec) + 
+									(end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+
+		printf("Key Length: %d bits\n", length);
+		printf("Encryption Time: %.2fs\n", encrypt_time_4096);
+		printf("Decryption Time: %.2fs\n", decrypt_time_4096);
+		
+		// Print peak memory usage for 4096-bit (example values, replace with actual measurements)
+		printf("Peak Memory Usage (Encryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
+		printf("Peak Memory Usage (Decryption): %ld Bytes\n", sizeof(long) * SIZE_OF_CIPHER_BYTE); // Replace with actual peak memory tracking if necessary
+
+		mpz_clear(p4096);
+		mpz_clear(q4096);
+        
     }
-
-
-
     return 0;
 }
