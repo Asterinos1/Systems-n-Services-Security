@@ -5,9 +5,9 @@
 #include <string.h>
 #include <time.h>
 
-// new libraries
+// new libraries for time/resource measurements.
 #include <sys/time.h>
-//#include <sys/resource.h>
+#include <sys/resource.h>
 
 #define SIZE_OF_CIPHER_BYTE 256
 
@@ -239,22 +239,6 @@ void print_help() {
                 "-h This help message\n\n");
 }
 
-
-// Printing stats
-// void printResourceUsage() {
-//     struct rusage usage;
-//     getrusage(RUSAGE_SELF, &usage);
-
-//     printf("Resource Usage:\n");
-//     printf("User CPU time used: %ld.%06ld seconds\n",
-//            (long)usage.ru_utime.tv_sec, (long)usage.ru_utime.tv_usec);
-//     printf("System CPU time used: %ld.%06ld seconds\n",
-//            (long)usage.ru_stime.tv_sec, (long)usage.ru_stime.tv_usec);
-//     printf("Max resident set size: %ld KB\n", usage.ru_maxrss);
-//     printf("Page faults: %ld\n", usage.ru_majflt + usage.ru_minflt);
-// }
-
-
 int main(int argc, char *argv[]) {
     int key_length = 0;
     char *input_file = NULL, *output_file = NULL, *key_file = NULL;
@@ -343,17 +327,25 @@ int main(int argc, char *argv[]) {
     } 
 	
     else if (analyze) {
-        
         printf("Analyzing RSA performance, results will be saved to %s...\n", performance_file);
 
         struct timeval start_time, end_time;
+        struct rusage usage_before, usage_after;
 
         int key_lengths[] = {1024, 2048, 4096};  // Array to hold key lengths
         int num_keys = sizeof(key_lengths) / sizeof(key_lengths[0]);
 
+        // Open the performance file for writing
+        FILE *performance_output = fopen(performance_file, "w");
+        if (performance_output == NULL) {
+            fprintf(stderr, "Error opening file for writing: %s\n", performance_file);
+            return 1;
+        }
+
         for (int i = 0; i < num_keys; i++) {
             int length = key_lengths[i];
-            printf("\n\n*** Now starting %d-bit RSA ***\n", length);
+            // Use the file instead of printing to console
+            fprintf(performance_output, "\n\n*** Now starting %d-bit RSA ***\n", length);
 
             mpz_t p, q;
             mpz_init(p);
@@ -371,34 +363,65 @@ int main(int argc, char *argv[]) {
             snprintf(public_key, 50, "public_%d.key", length);
             snprintf(private_key, 50, "private_%d.key", length);
 
+            // Get memory usage before
+            getrusage(RUSAGE_SELF, &usage_before);
+
             rsa_encrypt("plaintext.txt", cipher_file, public_key);
+
+            // Get memory usage after
+            getrusage(RUSAGE_SELF, &usage_after);
+
             gettimeofday(&end_time, NULL);
             double encrypt_time = (end_time.tv_sec - start_time.tv_sec) +
                                 (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
+            // Calculate peak memory usage
+            long peak_memory_before = usage_before.ru_maxrss * 1024;  // Convert to Bytes
+            long peak_memory_after = usage_after.ru_maxrss * 1024;    // Convert to Bytes
+
+            // Save results to the file
+            fprintf(performance_output, "Key Length: %d bits\n", length);
+            fprintf(performance_output, "Encryption Time: %.2fs\n", encrypt_time);
+            fprintf(performance_output, "Peak Memory Usage (Encryption): %ld Bytes\n", peak_memory_after - peak_memory_before);
+
             // Measure decryption time
             gettimeofday(&start_time, NULL);
+            
+            // Get memory usage before decryption
+            getrusage(RUSAGE_SELF, &usage_before);
             rsa_decrypt(cipher_file, decipher_file, private_key);
+            
+            // Get memory usage after decryption
+            getrusage(RUSAGE_SELF, &usage_after);
+            
             gettimeofday(&end_time, NULL);
             double decrypt_time = (end_time.tv_sec - start_time.tv_sec) +
                                 (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
-            printf("Key Length: %d bits\n", length);
-            printf("Encryption Time: %.2fs\n", encrypt_time);
-            printf("Decryption Time: %.2fs\n", decrypt_time);
+            // Calculate peak memory usage for decryption
+            long peak_memory_before2 = usage_before.ru_maxrss * 1024;  // Convert to Bytes
+            long peak_memory_after2 = usage_after.ru_maxrss * 1024;    // Convert to Bytes
 
+            // Save results to the file
+            fprintf(performance_output, "Decryption Time: %.2fs\n", decrypt_time);
+            fprintf(performance_output, "Peak Memory Usage (Decryption): %ld Bytes\n", peak_memory_after2 - peak_memory_before2);
+
+            // Clear variables
             mpz_clear(p);
             mpz_clear(q);
 
-            // Uncomment here for debbuging the files for private keys and cipher/decipher files
+            // Uncomment for debugging the files for private keys and cipher/decipher files
             // Clean up files for the current key length
-            remove(public_key);
-            remove(private_key);
-            remove(cipher_file);
-            remove(decipher_file);
+            // remove(public_key);
+            // remove(private_key);
+            // remove(cipher_file);
+            // remove(decipher_file);
+        }
 
-            printf("\n\n*** Finished %d-bit RSA ***\n", length); 
-        } 
+        // Close the performance output file
+        fclose(performance_output);
+        printf("Performance results saved to %s\n", performance_file);
     }
+
     return 0;
 }
