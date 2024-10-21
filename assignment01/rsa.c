@@ -94,7 +94,7 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
 }
 
 void generateRSAKeyPairSpecial(int key_length, mpz_t p, mpz_t q){
-    gmp_printf("Primes after generateRSAKeyPairSpecial: \n 1: %Zd\n 2: %Zd\n", p, q);
+    //gmp_printf("Primes after generateRSAKeyPairSpecial: \n 1: %Zd\n 2: %Zd\n", p, q);
     mpz_t n, lambda_n, e, d, gcd;
     gmp_randstate_t state;
 
@@ -456,7 +456,7 @@ int main(int argc, char *argv[]) {
 
 		mpz_clear(p4096);
 		mpz_clear(q4096);
-        
+
     }
     return 0;
 }
