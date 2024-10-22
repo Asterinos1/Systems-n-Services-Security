@@ -57,9 +57,8 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
 
     mpz_t reminder;
     mpz_init(reminder);
-    mpz_set_ui(e,65537); //e=65537 (to diabasa se ena site)
+    mpz_set_ui(e,65537); //e=65537
 
-    //find a suitable e
     do
     {   
         mpz_mod(reminder,e,lambda_n);
@@ -74,8 +73,8 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     mpz_invert(d, e, lambda_n);
 
     //testing delete later
-    gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
-    gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
+    //gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
+    //gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
 
     //write public and private key to the files
     FILE *pub_key_file = fopen("public.key", "w");
@@ -86,7 +85,6 @@ void generateRSAKeyPair(int key_length, mpz_t p, mpz_t q) {
     //close files
     fclose(pub_key_file);
     fclose(priv_key_file);
-
 
     // Clear memory
     mpz_clears(n, lambda_n, e, d, gcd, p_minus_1, q_minus_1, NULL);
@@ -119,7 +117,7 @@ void generateRSAKeyPairSpecial(int key_length, mpz_t p, mpz_t q){
     mpz_init(reminder);
     mpz_set_ui(e,65537); //e=65537 
 
-    //find a suitable e
+    // find a suitable e
     do
     {   
         mpz_mod(reminder,e,lambda_n);
@@ -130,31 +128,31 @@ void generateRSAKeyPairSpecial(int key_length, mpz_t p, mpz_t q){
         mpz_add_ui(e,e,1);
     } while (1);
 
-    //find d 
+    // find d 
     mpz_invert(d, e, lambda_n);
 
-    //testing delete later
-    //gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
-    //gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
+    // testing delete later
+    // gmp_printf("Public key: \n n: %Zd\n e: %Zd\n", n, e);
+    // gmp_printf("Private key: \n n: %Zd\n d: %Zd\n", n, d);
 
-	//New for approriate file naming.
-	// Create file names based on key length
+	// new for approriate file naming.
+	// create file names based on key length
 	char pub_key_filename[50], priv_key_filename[50];
 	snprintf(pub_key_filename, sizeof(pub_key_filename), "public_%d.key", key_length);
 	snprintf(priv_key_filename, sizeof(priv_key_filename), "private_%d.key", key_length);
 
-	// Write public and private key to the files
+	// write public and private key to the files
 	FILE *pub_key_file = fopen(pub_key_filename, "w");
 	FILE *priv_key_file = fopen(priv_key_filename, "w");
     gmp_fprintf(pub_key_file, "%Zd %Zd", n, e);
     gmp_fprintf(priv_key_file, "%Zd %Zd", n, d);
 
-    //close files
+    // close files
     fclose(pub_key_file);
     fclose(priv_key_file);
 
 
-    // Clear memory
+    // clear memory
     mpz_clears(n, lambda_n, e, d, gcd, p_minus_1, q_minus_1, NULL);
     mpz_clear(reminder);
 }
@@ -163,7 +161,7 @@ void rsa_encrypt(const char* input_file, const char* output_file, const char* pu
     mpz_t n, e, gmp_letter, cipherletter;
     mpz_inits(n, e, gmp_letter, cipherletter, NULL);
     
-    // Read public key from file
+    // read public key from file
     FILE *pub_key = fopen(pub_key_file, "r");
     gmp_fscanf(pub_key, "%Zd %Zd", n, e);
     fclose(pub_key);
@@ -174,12 +172,12 @@ void rsa_encrypt(const char* input_file, const char* output_file, const char* pu
     int letter;
     while ((letter = fgetc(input)) != EOF) { 
         mpz_set_ui(gmp_letter, letter);
-        mpz_powm(cipherletter, gmp_letter, e, n); // Encrypt: cipherletter = gmp_letter^e mod n
+        mpz_powm(cipherletter, gmp_letter, e, n); // encrypt: cipherletter = gmp_letter^e mod n
 
         size_t count;
         unsigned char* buffer = (unsigned char*) mpz_export(NULL, &count, 1, 1, 0, 0, cipherletter);
-        fwrite(&count, sizeof(size_t), 1, output); // Write the size of the buffer first
-        fwrite(buffer, 1, count, output);          // Write the actual buffer
+        fwrite(&count, sizeof(size_t), 1, output); // write the size of the buffer first
+        fwrite(buffer, 1, count, output);          // write the actual buffer
         free(buffer);
     }
 
@@ -236,6 +234,7 @@ void print_help() {
                 "-e Encrypt input and store results to output.\n"
                 "-a Compare the performance of RSA encryption and decryption with three\n"
                 "   different key lengths (1024, 2048, 4096 key lengths) in terms of computational time.\n"
+                "   (You need to have a file plaintext.txt for this to work.) \n"
                 "-h This help message\n\n");
 }
 
@@ -332,10 +331,10 @@ int main(int argc, char *argv[]) {
         struct timeval start_time, end_time;
         struct rusage usage_before, usage_after;
 
-        int key_lengths[] = {1024, 2048, 4096};  // Array to hold key lengths
+        int key_lengths[] = {1024, 2048, 4096};  // array to hold key lengths
         int num_keys = sizeof(key_lengths) / sizeof(key_lengths[0]);
 
-        // Open the performance file for writing
+        // open the performance file for writing
         FILE *performance_output = fopen(performance_file, "w");
         if (performance_output == NULL) {
             fprintf(stderr, "Error opening file for writing: %s\n", performance_file);
@@ -344,7 +343,7 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i < num_keys; i++) {
             int length = key_lengths[i];
-            // Use the file instead of printing to console
+            // use the file instead of printing to console
             fprintf(performance_output, "\n\n*** Now starting %d-bit RSA ***\n", length);
 
             mpz_t p, q;
@@ -354,7 +353,7 @@ int main(int argc, char *argv[]) {
             generatePrime(length / 2, p, q);
             generateRSAKeyPairSpecial(length, p, q);
 
-            // Measure encryption time
+            // measure encryption time
             gettimeofday(&start_time, NULL);
             char cipher_file[50], decipher_file[50], public_key[50], private_key[50];
 
@@ -363,12 +362,12 @@ int main(int argc, char *argv[]) {
             snprintf(public_key, 50, "public_%d.key", length);
             snprintf(private_key, 50, "private_%d.key", length);
 
-            // Get memory usage before
+            // get memory usage before
             getrusage(RUSAGE_SELF, &usage_before);
 
             rsa_encrypt("plaintext.txt", cipher_file, public_key);
 
-            // Get memory usage after
+            // get memory usage after
             getrusage(RUSAGE_SELF, &usage_after);
 
             gettimeofday(&end_time, NULL);
@@ -379,39 +378,39 @@ int main(int argc, char *argv[]) {
             long peak_memory_before = usage_before.ru_maxrss * 1024;  // Convert to Bytes
             long peak_memory_after = usage_after.ru_maxrss * 1024;    // Convert to Bytes
 
-            // Save results to the file
+            // save results to the file
             fprintf(performance_output, "Key Length: %d bits\n", length);
             fprintf(performance_output, "Encryption Time: %.2fs\n", encrypt_time);
             fprintf(performance_output, "Peak Memory Usage (Encryption): %ld Bytes\n", peak_memory_after - peak_memory_before);
 
-            // Measure decryption time
+            // measure decryption time
             gettimeofday(&start_time, NULL);
             
-            // Get memory usage before decryption
+            // get memory usage before decryption
             getrusage(RUSAGE_SELF, &usage_before);
             rsa_decrypt(cipher_file, decipher_file, private_key);
             
-            // Get memory usage after decryption
+            // get memory usage after decryption
             getrusage(RUSAGE_SELF, &usage_after);
             
             gettimeofday(&end_time, NULL);
             double decrypt_time = (end_time.tv_sec - start_time.tv_sec) +
                                 (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
-            // Calculate peak memory usage for decryption
+            // calculate peak memory usage for decryption
             long peak_memory_before2 = usage_before.ru_maxrss * 1024;  // Convert to Bytes
             long peak_memory_after2 = usage_after.ru_maxrss * 1024;    // Convert to Bytes
 
-            // Save results to the file
+            // save results to the file
             fprintf(performance_output, "Decryption Time: %.2fs\n", decrypt_time);
             fprintf(performance_output, "Peak Memory Usage (Decryption): %ld Bytes\n", peak_memory_after2 - peak_memory_before2);
 
-            // Clear variables
+            // clear variables
             mpz_clear(p);
             mpz_clear(q);
 
-            // Uncomment for debugging the files for private keys and cipher/decipher files
-            // Clean up files for the current key length
+            // Comment for debugging the files for private keys and cipher/decipher files
+            // clean up files for the current key length
             // remove(public_key);
             // remove(private_key);
             // remove(cipher_file);
