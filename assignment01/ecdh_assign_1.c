@@ -7,10 +7,10 @@
 
 //Elliptic Curve Diffie-Hellman (ECDH) Key Exchange
 
-// Setting key size.
+// setting key size.
 #define KEY_SIZE 32 
 
-// Function to display the help message
+// display the help message
 void print_help() {
     printf("Command Line Options for ECDH Tool:\n");
     printf("\t-o path      Path to output file\n");
@@ -84,15 +84,14 @@ int main(int argc, char *argv[]) {
                 output_file = optarg;  // Path to the output file
                 break;
             case 'a':
-                // Set Alice's private key if provided
-                // Formatted in length of 32 bytes (hexadecimal)
+                //set Alice's private key if provided
                 if (sscanf(optarg, "%32hhx", alice_private) != 1) {
                     printf("Invalid input for Alice's private key.\n");
                     return 1;
                 }
                 break;
             case 'b':
-                // Set Bob's private key if provided
+                //set Bob's private key if provided
                 if (sscanf(optarg, "%32hhx", bob_private) != 1) {
                     printf("Invalid input for Bob's private key.\n");
                     return 1;
@@ -119,44 +118,44 @@ int main(int argc, char *argv[]) {
     // printf(alice_private);
     // printf(bob_private);
 
-    // Generate Alice's private key randomly if not provided.
+    //generate Alice's private key randomly if not provided.
     if (alice_private[0] == 0) {
         randombytes_buf(alice_private, sizeof(alice_private));
     }
 
-    // Generate Bob's private key randomly if not provided.
+    //generate Bob's private key randomly if not provided.
     if (bob_private[0] == 0) {
         randombytes_buf(bob_private, sizeof(bob_private));
     }
 
-    // Generate public keys 
+    //generate public keys 
     crypto_scalarmult_base(alice_public, alice_private); // alice_public = alice_private * G
     crypto_scalarmult_base(bob_public, bob_private);    // bob_public = bob_private * G
 
-    // Calculate shared secrets
+    //calculate shared secrets
 	unsigned char alice_shared_secret[KEY_SIZE];
 	unsigned char bob_shared_secret[KEY_SIZE];
 
     // For Debugging purposes.
-	// Calculate Alice's shared secret
+	// calculate Alice's shared secret
 	if (crypto_scalarmult(alice_shared_secret, alice_private, bob_public) != 0) {
 		printf("Failed to calculate Alice's shared secret.\n");
 		return 1;
 	}
-	// Calculate Bob's shared secret
+	// calculate Bob's shared secret
 	if (crypto_scalarmult(bob_shared_secret, bob_private, alice_public) != 0) {
 		printf("Failed to calculate Bob's shared secret.\n");
 		return 1;
 	}
 
-    // Verify that shared secrets match
-    // Using memcmp since we're dealing with unsigned char data type.
+    // verify that shared secrets match
+    // using memcmp since we're dealing with unsigned char data type.
     if (memcmp(alice_shared_secret, bob_shared_secret, KEY_SIZE) != 0) {
         printf("Error: Shared secrets do not match!\n");
         return 1;
     }
 
-    // Write keys and shared secret to the output file
+    // write keys and shared secret to the output file
     create_file(output_file, alice_public, bob_public, alice_shared_secret);
 
     return 0;
