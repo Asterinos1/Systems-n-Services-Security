@@ -2,7 +2,7 @@ Security of Systems-n-Services (2024-2025)
 
 Assignment01
 Students: Asterinos Karalis 2020030107
-		  Zografoula Ioanna Neamonitaki 202030088
+		  Zografoula Ioanna Neamonitaki 2020030088
 
 Run 'make' in the terminal to generate both tools rsa_assign_1 and ecdh_assign_1.
 
