@@ -72,7 +72,7 @@ FILE *fopen(const char *path, const char *mode) {
     if ((is_action_denied == 1) || (file_mode == 1)) {
         strcpy(md5_hash, "0");
     } else {
-        gen_md5(path, md5_hash);
+        generate_file_hash(path, md5_hash);
     }
 
     /* Log to file */
@@ -129,7 +129,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
         is_action_denied = 0;
 
     /* Generate hash */
-    gen_md5(file_name, md5_hash);
+    generate_file_hash(file_name, md5_hash);
 
     /* Log to file */
     FILE *log_ptr = fopen_direct("file_logging.log", "a");
@@ -141,7 +141,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     return original_fwrite_ret;
 }
 
-void gen_md5(const char *path, char md5_hash[]) {
+void generate_file_hash(const char *path, char md5_hash[]) {
     EVP_MD_CTX *mdctx; // Context for the MD5 state
     unsigned char digest[EVP_MD_size(EVP_md5())]; // Buffer for the hash
     FILE *file = fopen_direct(path, "rb"); // Open the file for reading in binary mode
