@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+#define LENGTH_SIZE 16
+// #define MD5_HASH 33
 
 #include <time.h>
 #include <stdio.h>
@@ -7,96 +9,206 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <openssl/evp.h> // For SHA-256
+//#include <openssl/md5.h>
 
-// Function to compute file hash using SHA-256
-void compute_sha256(FILE *file, char *outputBuffer) {
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    unsigned int lengthOfHash = 0;
-    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    if (mdctx == NULL) {
-        perror("Failed to create EVP_MD_CTX");
-        return;
-    }
-    
-    const EVP_MD *md = EVP_sha256();  // Use SHA-256
-    EVP_DigestInit_ex(mdctx, md, NULL);
-    
-    unsigned char buffer[1024];
-    size_t bytesRead = 0;
-    
-    // Read the file and update the hash context
-    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-        EVP_DigestUpdate(mdctx, buffer, bytesRead);
-    }
-    
-    // Finalize the hash
-    EVP_DigestFinal_ex(mdctx, hash, &lengthOfHash);
-    EVP_MD_CTX_free(mdctx);
+#include <openssl/evp.h>
 
-    // Convert hash to hex string
-    for (int i = 0; i < lengthOfHash; i++) {
-        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
-    }
-    outputBuffer[lengthOfHash * 2] = '\0'; // Null-terminate the hash string
+
+
+FILE * 
+fopen_direct(const char *path, const char *mode){
+
+    FILE *original_fopen_ret;
+    FILE *(*original_fopen)(const char*, const char*);
+
+    /* call the original fopen function */
+    original_fopen = dlsym(RTLD_NEXT, "fopen");
+    original_fopen_ret = (*original_fopen)(path, mode);
+
+    return original_fopen_ret;
 }
 
-// Helper function to log information to the log file
-void log_file_access(const char *path, const char *mode, int access_type, int denied) {
-    FILE *log_file = fopen("file_logging.log", "a"); 
-    printf("Accessing the log file");
-    if (!log_file) return;
+/* Add to Log file func */
+void
+write_log(int uid, unsigned char *file_name, char *datetime, int access_type, int is_action_denied, char *digest){
+	/* Log File */
+	FILE * ptr;
+	ptr = fopen_direct("file_logging.log" ,"a");
+	if (ptr != NULL) {
+		fprintf(ptr, "%d %s %s %d %d %s\n", uid, file_name, strtok(datetime, "\n"), access_type, is_action_denied, digest);
+	}
 
-    // Get UID and current time
-    uid_t uid = getuid();
-    time_t current_time = time(NULL);
-    struct tm *local_time = localtime(&current_time);
-    
-    // Open the file to hash it
-    FILE *file_to_hash = fopen(path, "rb");
-    char file_hash[65] = "N/A";
-    if (file_to_hash) {
-        compute_sha256(file_to_hash, file_hash);
-        fclose(file_to_hash);
+	fclose(ptr);
+}
+
+
+FILE * fopen(const char *path, const char *mode){
+	/* Have to check file existence before procceding */
+	int exists = cfileexists(path); // Helper
+
+	FILE *original_fopen_ret;
+	FILE *(*original_fopen)(const char*, const char*);
+
+	/* call the original fopen function */
+	original_fopen = dlsym(RTLD_NEXT, "fopen");
+	original_fopen_ret = (*original_fopen)(path, mode);
+
+
+	/* add your code here */	
+	char md5_hash[LENGTH_SIZE*2+1];
+	int uid = getuid();
+	unsigned char *file_name, *datetime;
+	int file_mode, is_action_denied;
+
+
+	/* Getting the time */
+	time_t now = time(&now);        
+    struct tm *ptm = localtime(&now); 
+
+	/* Action is denied until proven the oposite */
+	is_action_denied = 1;
+	
+	file_name = realpath(path, NULL);
+
+	/* Checking fopen Mode and if user has permission for each action */
+	/* Case mode == 1 || File Creation */
+    if (exists) {
+		if (!strcmp(mode, "r") || (!strcmp(mode, "rb"))) {
+			file_mode = 2;
+			if (access(path, R_OK) == 0)
+				is_action_denied = 0;
+		}
+		else {
+			file_mode = 3;
+			if (access(path, W_OK) == 0) {
+				is_action_denied = 0;
+			}
+		}	
+    }
+	else
+	{
+		file_mode = 1;
+			if (access(path, W_OK) == 0)
+				is_action_denied = 0;	
+	}
+
+	if ((is_action_denied==1) || (file_mode==1)) {
+		/* MD5 is hash if user can't access the file or file is just created */
+		strcpy(md5_hash, "0");
+	}
+	else {
+		gen_md5(path, md5_hash);
+	}
+
+	/* Call log */	
+	write_log(uid, file_name, asctime(ptm), file_mode, is_action_denied, md5_hash);
+
+	return original_fopen_ret;
+}
+
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream){
+
+	size_t original_fwrite_ret;
+	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
+
+	/* call the original fwrite function */
+	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
+
+
+	/* add your code here */
+	char md5_hash[LENGTH_SIZE*2+1];
+	int MAXSIZE = 0xFFF;
+    char proclnk[0xFFF];
+    char path[0xFFF];
+	int uid = getuid();
+	unsigned char *file_name, *datetime;
+	int fno, file_mode, is_action_denied;
+	ssize_t r;
+
+	/* Finding file name from fp */
+	if (stream != NULL)
+    {
+        fno = fileno(stream);
+        sprintf(proclnk, "/proc/self/fd/%d", fno);
+        r = readlink(proclnk, path, MAXSIZE);
+        if (r < 0)
+        {
+            printf("failed to readlink\n");
+            exit(1);
+        }
+        path[r] = '\0';
+    }
+	fflush(stream);
+	file_name = basename(path);
+
+	/* Getting the time */
+	time_t now = time(&now);        
+    struct tm *ptm = localtime(&now); 
+
+	/* Action is denied until proven the oposite */
+	is_action_denied = 1;
+
+	if (access(file_name, W_OK)==0)
+		is_action_denied = 0;
+
+	gen_md5(file_name, md5_hash);
+	write_log(uid, path, asctime(ptm), 3, is_action_denied, md5_hash);
+
+	return original_fwrite_ret;
+}
+
+int cfileexists(const char* filename){
+    struct stat buffer;
+    int exist = stat(filename,&buffer);
+    if(exist == 0)
+        return 1;
+    else // -1
+        return 0;
+}
+
+void gen_md5(const char *path, char md5_hash[]) {
+    EVP_MD_CTX *mdctx; // Context for the MD5 state
+    unsigned char digest[EVP_MD_size(EVP_md5())]; // Buffer for the hash
+    FILE *file = fopen_direct(path, "rb"); // Open the file for reading in binary mode
+    unsigned char buffer[1024]; // Buffer for reading file
+    size_t bytesRead;
+
+    if (file == NULL) {
+        perror("File opening failed");
+        return; // Handle error opening file
     }
 
-    // Log the required information
-    fprintf(log_file, "UID: %d, File: %s, Date: %02d-%02d-%04d, Time: %02d:%02d:%02d, Access Type: %d, Denied: %d, Hash: %s\n",
-            uid, path, local_time->tm_mday, local_time->tm_mon + 1, local_time->tm_year + 1900,
-            local_time->tm_hour, local_time->tm_min, local_time->tm_sec, access_type, denied, file_hash);
+    mdctx = EVP_MD_CTX_new(); // Create a new MD5 context
+    EVP_DigestInit_ex(mdctx, EVP_md5(), NULL); // Initialize the context with MD5
 
-    fclose(log_file);
+    // Read the file in chunks and update the digest
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) != 0) {
+        EVP_DigestUpdate(mdctx, buffer, bytesRead); // Update the digest with the buffer
+    }
+
+    EVP_DigestFinal_ex(mdctx, digest, NULL); // Finalize the digest calculation
+    EVP_MD_CTX_free(mdctx); // Free the context
+
+    // Convert the digest to hexadecimal string
+    for (int i = 0; i < LENGTH_SIZE; i++) {
+        sprintf(&md5_hash[i * 2], "%02X", digest[i]);
+    }
+
+    fclose(file); // Close the file
 }
 
-FILE *fopen(const char *path, const char *mode) {
-    // Call the original fopen
-    FILE *(*original_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    FILE *file = original_fopen(path, mode);
 
-    // Check if the file was opened or created
-    int access_type = (strchr(mode, 'w') != NULL) ? 0 : 1; // 0 for creation, 1 for open
-    int denied = (file == NULL) ? 1 : 0;
+void print_string(unsigned char *data, size_t len)
+{
+	size_t i;
 
-    // Log the file access attempt
-    log_file_access(path, mode, access_type, denied);
-
-    return file;
-}
-
-size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    // Call the original fwrite
-    size_t (*original_fwrite)(const void*, size_t, size_t, FILE*) = dlsym(RTLD_NEXT, "fwrite");
-    size_t result = original_fwrite(ptr, size, nmemb, stream);
-
-    // Get the file descriptor and log the write attempt
-    char path[1024];
-    int fd = fileno(stream);
-    snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
-    char actual_path[1024];
-    readlink(path, actual_path, sizeof(actual_path) - 1);
-
-    // Log the write operation (access type 2)
-    log_file_access(actual_path, "w", 2, 0);
-
-    return result;
+	if (!data)
+		printf("NULL data\n");
+	else {
+		for (i = 0; i < len; i++)
+			printf("%c", data[i]);
+		printf("\n");
+	}
 }
