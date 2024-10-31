@@ -1,3 +1,6 @@
+**SIMANTIKO: STO ACMONITOR YPARXEI MIA METAVLITI ME ONOMA MD5_HASH, PREPEI NA ALLAXTEI**
+
+
 How to setup:
 
 - Download all files in the same folder
