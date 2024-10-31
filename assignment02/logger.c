@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
-
 #include <openssl/evp.h>
 
 FILE *fopen_direct(const char *path, const char *mode) {
@@ -25,7 +24,7 @@ FILE *fopen_direct(const char *path, const char *mode) {
 FILE *fopen(const char *path, const char *mode) {
     /* Check file existence using stat */
     struct stat buffer;
-    int exists = (stat(path, &buffer) == 0); // Replaces cfileexists
+    int exists = (stat(path, &buffer) == 0); 
 
     FILE *original_fopen_ret;
     FILE *(*original_fopen)(const char*, const char*);
@@ -34,7 +33,7 @@ FILE *fopen(const char *path, const char *mode) {
     original_fopen = dlsym(RTLD_NEXT, "fopen");
     original_fopen_ret = (*original_fopen)(path, mode);
 
-    /* Add your code here */
+    
     char md5_hash[LENGTH_SIZE * 2 + 1];
     int uid = getuid();
     unsigned char *file_name;
@@ -69,7 +68,7 @@ FILE *fopen(const char *path, const char *mode) {
             is_action_denied = 0;
     }
 
-    /* Generate MD5 hash */
+    /* Generate hash */
     if ((is_action_denied == 1) || (file_mode == 1)) {
         strcpy(md5_hash, "0");
     } else {
@@ -94,7 +93,6 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     original_fwrite = dlsym(RTLD_NEXT, "fwrite");
     original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
 
-    /* Add your code here */
     char md5_hash[LENGTH_SIZE * 2 + 1];
     int MAXSIZE = 0xFFF;
     char proclnk[0xFFF];
@@ -130,7 +128,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     if (access(file_name, W_OK) == 0)
         is_action_denied = 0;
 
-    /* Generate MD5 hash */
+    /* Generate hash */
     gen_md5(file_name, md5_hash);
 
     /* Log to file */
