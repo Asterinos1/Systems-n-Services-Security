@@ -54,7 +54,7 @@ void list_unauthorized_accesses(FILE *log) {
     printf("Malicious users:\n");
     for (int i = 0; i < MAX_USERS; i++) {
         if (unauthorized_count[i] > 5) {
-            printf("User ID: %d, Unauthorized Attempts: %d\n", i, unauthorized_count[i]);
+            printf("User ID: %d\n", i);
         }
     }
 }
