@@ -94,17 +94,6 @@ int main()
 		}
 	}
 	printf("Test 4 finished.\n");
-
-	// Test 5: Remove all files created
-	printf("\nTest 5: Removing all created files.\n");
-	for (i = 0; i < 10; i++) {
-		if (remove(filenames[i]) == 0) {
-			printf("Successfully removed %s\n", filenames[i]);
-		} else {
-			printf("Error removing %s, error: %s\n", filenames[i], strerror(errno));
-		}
-	}
-	printf("Test 5 finished.\n");
-
+	
 	return 0;
 }
