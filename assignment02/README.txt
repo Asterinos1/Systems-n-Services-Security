@@ -12,5 +12,9 @@ This will generate the logging file which can later be accessed by ./acmonitor -
 Options for the acmonitor tool:
 
 -m Prints malicious users
--i <filename> Prints users that modified the file given and the number of modifications
+-i <file path> Prints users that modified the file given and the number of modifications
 -h Help message
+
+Example usage:
+./acmonitor -m
+./acmonitor -i /home/user/Desktop/project/file_1  (copy path of file and paste it here basically)
