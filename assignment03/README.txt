@@ -3,7 +3,11 @@ Security of Systems-n-Services (2024-2025)
 Assignment03
 Students: Asterinos Karalis 2020030107  - Zografoula Ioanna Neamonitaki 2020030088
 
-taskA1 working, generating right the signatures
-TaskA2 not working, generating pdf files with malicius and not malicius signatures but the file taskA_2 den anagnorizei
-ta malicius signatures
-TaskA3 working (tha rotiso atoma an exoun to idio apotelesma)
+Task A:
+Step 1) Run taskA_2_create_test_files.py 
+Step 2) Run taskA_1.py
+Step 3) Run taskA_2.py
+Step 4) Run taskA_3.py
+
+**Note taskA_3 works right but the pdfs given are all clean so there is not match in the comparison
+of the hashes!
