@@ -6,3 +6,4 @@ Students: Asterinos Karalis 2020030107  - Zografoula Ioanna Neamonitaki 20200300
 taskA1 working, generating right the signatures
 TaskA2 not working, generating pdf files with malicius and not malicius signatures but the file taskA_2 den anagnorizei
 ta malicius signatures
+TaskA3 working (tha rotiso atoma an exoun to idio apotelesma)
