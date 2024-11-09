@@ -2,7 +2,6 @@ import os
 import hashlib
 from itertools import combinations
 
-# Function to generate hashes for the pdfs
 def generate_file_hashes(file_path):
     hash_sha1 = hashlib.sha1()
     hash_sha256 = hashlib.sha256()
@@ -24,12 +23,11 @@ def generate_file_hashes(file_path):
         print(f"Error: File '{file_path}' not found.")
         return None
 
-# Main script to generate and compare hashes
 if __name__ == "__main__":
     directory = 'sample_pdfs'
     pdf_hashes = []
 
-    # Generate hashes for each PDF file and store them
+    #calculate the hashes for each PDF file and store them
     for file_name in os.listdir(directory):
         file_path = os.path.join(directory, file_name)
         if os.path.isfile(file_path) and file_name.endswith('.pdf'):
