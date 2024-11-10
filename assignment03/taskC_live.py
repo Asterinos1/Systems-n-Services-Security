@@ -120,7 +120,6 @@ def main():
     parser.add_argument('-d', '--directory', required=True, help="Directory to scan")
     parser.add_argument('-s', '--signature_file', required=True, help="Path to the malware signature database")
     parser.add_argument('-o', '--output_file', required=True, help="File to save a report of infected files")
-    parser.add_argument('-r', '--real_time', action='store_true', help="Run in real-time mode to monitor the directory")
 
     args = parser.parse_args()
 
@@ -131,9 +130,8 @@ def main():
         print("No signatures loaded. Exiting...")
         return
 
-    # If real-time monitoring is enabled
-    if args.real_time:
-        start_real_time_monitoring(args.directory, signature_db, args.output_file, quarantine_dir="quarantine")
+    # Always run real-time monitoring
+    start_real_time_monitoring(args.directory, signature_db, args.output_file, quarantine_dir="quarantine")
 
 if __name__ == "__main__":
     main()
