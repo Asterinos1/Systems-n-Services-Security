@@ -9,13 +9,13 @@ Make sure to reset and then setup the enviroment before using the tool.
   2) Use 'setup.py' to setup the enviroment, that is to generate the test_files, the signatures database and the testing directory.
 
 Task A: Signature Database and detection 
-  Step 1) Run taskA_2_create_test_files.py 
-  Step 2) Run taskA_1.py
-  Step 3) Run taskA_2.py
-  Step 4) Run taskA_3.py
+  Step 1) Run taskA_2_create_test_files.py to generate the_files.
+  Step 2) Run taskA_1.py to create the signatures database.
+  Step 3) Run taskA_2.py to check the files.
+  Step 4) Run taskA_3.py to scan the given pdf files.
 
 **Note taskA_3 works right but the pdfs given are all clean so there is not match in the comparison
-of the hashes!
+of the hashes!**
 
 Task B: Search and Quarantine  
   Step 1) Run taskA_2_create_test_files.py to create the test_files.
