@@ -60,7 +60,7 @@ def load_signature_database(file_path):
     return signature_db
 
 if __name__ == "__main__":
-    signature_file = 'generated_malware_signatures.txt'  #allakse to path me to path gia to generated, an kai nomizo doulevei etsi
+    signature_file = 'generated_malware_signatures.txt' 
     #load the malicius signatures
     signature_db = load_signature_database(signature_file)
     
