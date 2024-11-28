@@ -4,6 +4,7 @@ Assignment05
 Students: Asterinos Karalis 2020030107  - Zografoula Ioanna Neamonitaki 2020030088
 
 Steps
-
+if you dont have the library libpcap first dowload it with this command:
+sudo apt-get install libpcap-dev
 1. gcc pcap_ex.c -o pcap_ex
 2. ./pcap_ex -h or ./pcap_ex -i etc..
