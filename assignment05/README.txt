@@ -6,8 +6,10 @@ Students: Asterinos Karalis 2020030107  - Zografoula Ioanna Neamonitaki 20200300
 Steps
 if you dont have the library libpcap first dowload it with this command:
 sudo apt-get install libpcap-dev
-1. gcc pcap_ex.c -o pcap_ex -lpcap
+1. gcc pcap_ex.c -o pcap_ex     or gcc pcap_ex.c -o test -lpcap
 2. ./pcap_ex -h or ./pcap_ex -i etc..
+
+NOTE: If it says you don't have permission use sudo, example: sudo ./test -i eth0
 
 for  ./pcap_ex -i try first ifconfigure to see the devices and then write a device to show the len
 of packets
