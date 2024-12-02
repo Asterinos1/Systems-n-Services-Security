@@ -303,22 +303,83 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
 
         printf("Packet %d: Source IP: %s, Destination IP: %s \n", ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
+        // Check transport layer protocol
         if (ip_header->ip_p == IPPROTO_TCP) {
+            // TCP packet
             struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
+
             if (is_retransmission(ntohl(tcp_header->seq))) {
-                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
+                ntohs(tcp_header->source), ntohs(tcp_header->dest));
             }
+
+            int tcp_header_length = tcp_header->doff * 4; // TCP header length in bytes
+            int tcp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + tcp_header_length);
+            printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+            printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
+    
+            const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + tcp_header_length;
+            printf("TCP Payload starts at memory location: %p\n", payload);
+            // Apply filter
+          
+            if (filter_expression) {
+                char *filter_port_str = strstr(filter_expression, "port ");
+                if (filter_port_str) {
+                    int filter_port = atoi(filter_port_str + 5); // Extract port from "port XXXX"
+                    if (ntohs(tcp_header->source) != filter_port && ntohs(tcp_header->dest) != filter_port) {
+                        continue; // Skip packet if it doesn't match the port
+                    }
+                }
+            }
+            
+            printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+
             total_tcp_bytes += header->len;
             tcp_packets++;
             tcp_flows++;
+
         } else if (ip_header->ip_p == IPPROTO_UDP) {
+            // UDP packet
             struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
+            
+            // can't replicate the same method of udp (doesn't have the seq inside its struct)
+            // if (is_retransmission(ntohl(udp_header->seq))) {
+            //     printf("Retransmitted UDP Packet: Src Port: %d, Dst Port: %d\n",
+            //     ntohs(udp_header->source), ntohs(udp_header->dest));
+            // }
+            
+            int udp_header_length = sizeof(struct udphdr); // UDP header length is fixed
+            int udp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + udp_header_length);
+            
+            printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
+            printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
+
+            const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + udp_header_length;
+            printf("UDP Payload starts at memory location: %p\n", payload);
+            // Apply filter
+            if (filter_expression) {
+                char *filter_port_str = strstr(filter_expression, "port ");
+                //printf("this is the filter port: %s\n", filter_port_str);
+                if (filter_port_str) {
+                    int filter_port = atoi(filter_port_str + 5); // Extract port from "port XXXX"
+                    if (ntohs(udp_header->source) != filter_port && ntohs(udp_header->dest) != filter_port) {
+                        printf("\n");
+                        printf("Skipped packets with Src Port: %d, Dst Port: %d\n\n",
+                        ntohs(udp_header->source), ntohs(udp_header->dest));
+                        
+                        continue; // Skip packet if it doesn't match the port
+                    }
+                }
+            }
+
+            printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
+
             total_udp_bytes += header->len;
             udp_packets++;
             udp_flows++;
         }
-
         total_packets++;
+
         if (packet_count >= max_packets) {
             printf("Max packets reached!\n");
             break;
