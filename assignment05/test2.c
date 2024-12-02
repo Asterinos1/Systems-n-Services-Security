@@ -254,8 +254,86 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
     pcap_close(descr);
 }
 
+void capture_pcap_file(const char *file_name, const char *filter_expression) {
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *descr = pcap_open_offline(file_name, errbuf);
+    if (descr == NULL) {
+        fprintf(stderr, "pcap_open_offline() failed: %s\n", errbuf);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Processing pcap file: %s with filter: %s\n", file_name, filter_expression);
+
+    struct pcap_pkthdr *header;
+    const u_char *packet;
+    int res;
+    int packet_count = 0;
+    int max_packets = 50;
+
+    while ((res = pcap_next_ex(descr, &header, &packet)) >= 0) {
+        if (res == 0) {
+            // Timeout
+            continue;
+        }
+
+        struct ether_header *eth_header = (struct ether_header *)packet;
+        if (ntohs(eth_header->ether_type) != ETHERTYPE_IP) {
+            // Skip non-IP packets
+            continue;
+        }
+
+        const struct ip *ip_header = (struct ip *)(packet + sizeof(struct ether_header));
+        size_t ip_header_length = ip_header->ip_hl * 4;
+        uint8_t protocol = ip_header->ip_p;
+
+        printf("Protocol: ");
+        switch (protocol) {
+            case IPPROTO_TCP:
+                printf("TCP\n");
+                break;
+            case IPPROTO_UDP:
+                printf("UDP\n");
+                break;
+            case IPPROTO_ICMP:
+                printf("ICMP\n");
+                break;
+            default:
+                printf("Other (protocol number: %d)\n", protocol);
+        }
+
+        printf("Packet %d: Source IP: %s, Destination IP: %s \n", ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
+
+        if (ip_header->ip_p == IPPROTO_TCP) {
+            struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
+            if (is_retransmission(ntohl(tcp_header->seq))) {
+                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+            }
+            total_tcp_bytes += header->len;
+            tcp_packets++;
+            tcp_flows++;
+        } else if (ip_header->ip_p == IPPROTO_UDP) {
+            struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
+            total_udp_bytes += header->len;
+            udp_packets++;
+            udp_flows++;
+        }
+
+        total_packets++;
+        if (packet_count >= max_packets) {
+            printf("Max packets reached!\n");
+            break;
+        }
+    }
+
+    if (res == -1) {
+        fprintf(stderr, "Error reading packets: %s\n", pcap_geterr(descr));
+    }
+
+    pcap_close(descr);
+}
 
 
+//not used in the final build
 void capture_packet(const char *dev){
     int i;
     char errbuf[PCAP_ERRBUF_SIZE];
@@ -315,70 +393,78 @@ void capture_packet(const char *dev){
 
 }
 
-int main(int argc, char *argv[]) {
-    char *network_interface_name= NULL, *packet_capture_file_name= NULL, *filter_expression= NULL;
-    int select_nin = 0, packet_capture = 0, filter_exp_flag = 0;
+void create_output_file(const char *filename) {
+    FILE *file = fopen(filename, "w");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file for writing: %s\n", filename);
+        return;
+    }
 
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0) {
-            print_help();
-            return 0;
-        }
-        else if (strcmp(argv[i], "-i") == 0) {
-            if (i + 1 < argc) {
-                network_interface_name = argv[++i];
-                select_nin = 1;
-            } else {
-                fprintf(stderr, "Error: Missing network interface name after -i\n");
+    fprintf(file, "*** Final Stats ***\n");
+    fprintf(file, "Total packets: %d\n", total_packets);
+    fprintf(file, "Total TCP packets: %d\n", tcp_packets);
+    fprintf(file, "Total UDP packets: %d\n", udp_packets);
+    fprintf(file, "Total TCP bytes: %d\n", total_tcp_bytes);
+    fprintf(file, "Total UDP bytes: %d\n", total_udp_bytes);
+    fprintf(file, "Captured %d TCP flows\n", tcp_flows);
+    fprintf(file, "Captured %d UDP flows\n", udp_flows);
+
+    fclose(file);
+}
+
+int main(int argc, char *argv[]) {
+    char *dev = NULL;
+    char *file_name = NULL;
+    char *filter_expression = NULL;
+    int opt;
+
+    // Parsing command-line arguments
+    while ((opt = getopt(argc, argv, "i:r:f:h")) != -1) {
+        switch (opt) {
+            case 'i':
+                dev = optarg;
+                break;
+            case 'r':
+                file_name = optarg;
+                break;
+            case 'f':
+                filter_expression = optarg;
+                break;
+            case 'h':
+                print_help();
+                return 0;
+            default:
+                print_help();
                 return 1;
-            }
-        } 
-        else if (strcmp(argv[i], "-r") == 0) {
-            if (i + 1 < argc) {
-                packet_capture_file_name = argv[++i];
-                packet_capture=1;
-            } else {
-                fprintf(stderr, "Error: Missing packet capture file name after -r\n");
-                return 1;
-            }
-        } 
-        else if (strcmp(argv[i], "-f") == 0) {
-            if (i + 1 < argc) {
-                filter_expression = argv[++i];
-                filter_exp_flag=1;
-            } else {
-                fprintf(stderr, "Error: Missing filter expression after -f\n");
-                return 1;
-            }
-        } 
-        else {
-            fprintf(stderr, "Error: Unknown option %s\n", argv[i]);
-            return 1;
         }
     }
 
-    if (select_nin) {
-        printf("Your netowrk interface is %s...\n", network_interface_name);
-        //capture_packet(network_interface_name);
-        capture_packet_with_filter(network_interface_name, filter_expression);
+    if (file_name != NULL) {
+        capture_pcap_file(file_name, filter_expression);
+        create_output_file("offline_output.txt");
+        printf("\n*** Final Stats ***");
+        printf("Total packets: %d", total_packets);
+        printf("Total TCP packets: %d\n", tcp_packets);
+        printf("Total UDP packets: %d\n", udp_packets);
+        printf("Total TCP bytes: %d\n", total_tcp_bytes);
+        printf("Total UDP bytes: %d\n", total_udp_bytes);
+        printf("Captured %d TCP flows\n", tcp_flows);
+        printf("Captured %d UDP flows\n", udp_flows);
+    } else if (dev != NULL) {
+        capture_packet_with_filter(dev, filter_expression);
+        create_output_file("online_output.txt");
+        printf("\n*** Final Stats ***");
+        printf("Total packets: %d", total_packets);
+        printf("Total TCP packets: %d\n", tcp_packets);
+        printf("Total UDP packets: %d\n", udp_packets);
+        printf("Total TCP bytes: %d\n", total_tcp_bytes);
+        printf("Total UDP bytes: %d\n", total_udp_bytes);
+        printf("Captured %d TCP flows\n", tcp_flows);
+        printf("Captured %d UDP flows\n", udp_flows);
+    } else {
+        printf("No input source specified. Use -i for device or -r for pcap file.\n");
+        return 1;
+    }
 
-    } 
-    else if (packet_capture) {
-        printf("packet capture file name is %s...\n", packet_capture_file_name);
-
-    } 
-    else if (filter_exp_flag) {
-        printf("Filter expression in string format is %s...\n",filter_expression);
-
-    } 
-
-    printf("\n*** Final Stats ***");
-    printf("Total packets: %d", total_packets);
-    printf("Total TCP packets: %d\n", tcp_packets);
-    printf("Total UDP packets: %d\n", udp_packets);
-    printf("Total TCP bytes: %d\n", total_tcp_bytes);
-    printf("Total UDP bytes: %d\n", total_udp_bytes);
-    printf("Captured %d TCP flows\n", tcp_flows);
-    printf("Captured %d UDP flows\n", udp_flows);
     return 0;
 }
