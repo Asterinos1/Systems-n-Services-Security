@@ -13,3 +13,11 @@ NOTE: If it says you don't have permission use sudo, example: sudo ./test -i eth
 
 for  ./pcap_ex -i try first ifconfigure to see the devices and then write a device to show the len
 of packets
+
+Example usage of the tool:
+1) sudo gcc pcap_ex.c -o pcap_ex -lpcap (linking library just in case)
+2) sudo ./pcap_ex -r mirai.pcap (offline mode, make sure mirai.pcap is inside the project's directory)
+3) sudo ./pcap_ex -i eth0 -f port "0808" 
+4) sudp ./pcap_ex -h 
+
+Depending if we use online/offline mode, the corresponding output txt file will be created.
