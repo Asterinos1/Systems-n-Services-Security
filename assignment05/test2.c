@@ -123,7 +123,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
     const u_char *packet;
     int res;
     int packet_count=0;
-    int max_packets=50;
+    int max_packets=200;
 
     while ((res = pcap_next_ex(descr, &header, &packet)) >= 0) {
         if (res == 0) {
@@ -161,7 +161,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
                 printf("Other (protocol number: %d)\n",protocol);
         }
 
-        printf("Packet %d: Source IP: %s, Destination IP: %s \n",
+        printf("\nPacket %d: Source IP: %s, Destination IP: %s \n",
         ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
         // Check transport layer protocol
@@ -268,7 +268,7 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
     const u_char *packet;
     int res;
     int packet_count = 0;
-    int max_packets = 50;
+    int max_packets = 200;
 
     while ((res = pcap_next_ex(descr, &header, &packet)) >= 0) {
         if (res == 0) {
@@ -460,7 +460,6 @@ void create_output_file(const char *filename) {
         fprintf(stderr, "Error opening file for writing: %s\n", filename);
         return;
     }
-
     fprintf(file, "*** Final Stats ***\n");
     fprintf(file, "Total packets: %d\n", total_packets);
     fprintf(file, "Total TCP packets: %d\n", tcp_packets);
