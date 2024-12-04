@@ -19,27 +19,8 @@
 
 typedef unsigned char u_char;
 
+#define MAX_SEQS 10000 // random size basically :/
 
-/* FOR TRACKING RETRANSMITTED PACKETS */
-// A simple hash table to track TCP sequence numbers
-#define MAX_SEQS 10000 // random size basically
-static uint32_t seen_tcp_seqs[MAX_SEQS];
-static int seq_idx = 0;
-
-int is_retransmission(uint32_t seq_num) {
-    for (int i = 0; i < seq_idx; i++) {
-        if (seen_tcp_seqs[i] == seq_num) {
-            return 1;  //packet is retransmitted
-        }
-    }
-    if (seq_idx < MAX_SEQS) {
-        seen_tcp_seqs[seq_idx++] = seq_num;
-    }
-    return 0;
-}
-
-
-/* FOR TRACKING STATS ON PROGRAM EXIT*/
 static int total_packets = 0;
 static int tcp_packets = 0;
 static int udp_packets = 0;
@@ -48,6 +29,8 @@ static int total_udp_bytes = 0;
 static int tcp_flows = 0;
 static int udp_flows = 0;
 
+static uint32_t seen_tcp_seqs[MAX_SEQS];  //better to use unsigned int to guarantee space for entries
+static int seq_idx = 0;					  //here we save the retrasmissions
 
 void print_help() {
    printf("Network traffic monitoring using the Packer Capture library\n\n"
@@ -91,31 +74,27 @@ void capture_packets(const char *network_interface){
 }
 */
 
-void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
-        packet)
-{
-    //this is for debugging only !
-    static int count = 1;
-    fprintf(stdout,"%d, ",count);
-    if(count == 4)
-        fprintf(stdout,"count == 4!!! ");
-    if(count == 7)
-        fprintf(stdout,"count == 7!! ");
-    fflush(stdout);
-    count++;
+int check_retransmission(uint32_t seq_num) {
+    for (int i = 0; i < seq_idx; i++) {
+        if (seen_tcp_seqs[i] == seq_num) {
+            return 1;  //packet is retransmitted
+        }
+    }
+    if (seq_idx < MAX_SEQS) {
+        seen_tcp_seqs[seq_idx++] = seq_num;
+    }
+    return 0;
 }
 
 void capture_packet_with_filter(const char *dev, const char *filter_expression) {
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *descr;
-
-    // Open the device for capturing
+    //start online capture
     descr = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
     if (descr == NULL) {
         fprintf(stderr, "pcap_open_live() failed: %s\n", errbuf);
         exit(EXIT_FAILURE);
     }
-
     printf("Capturing packets on %s with filter: %s\n", dev, filter_expression);
 
     //struct pcap_pkthdr *header;
@@ -169,20 +148,21 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
             // TCP packet
             struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
 
-            if (is_retransmission(ntohl(tcp_header->seq))) {
+			//check retransmission
+            if (check_retransmission(ntohl(tcp_header->seq))) {
                 printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
                 ntohs(tcp_header->source), ntohs(tcp_header->dest));
             }
 
-            int tcp_header_length = tcp_header->doff * 4; // TCP header length in bytes
+            int tcp_header_length = tcp_header->doff * 4;
             int tcp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + tcp_header_length);
             printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
             printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
     
             const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + tcp_header_length;
             printf("TCP Payload starts at memory location: %p\n", payload);
-            // Apply filter
-          
+            
+			//check filter
             if (filter_expression) {
                 char *filter_port_str = strstr(filter_expression, "port ");
                 if (filter_port_str) {
@@ -202,22 +182,16 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
         } else if (ip_header->ip_p == IPPROTO_UDP) {
             // UDP packet
             struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
-            
-            // can't replicate the same method of udp (doesn't have the seq inside its struct)
-            // if (is_retransmission(ntohl(udp_header->seq))) {
-            //     printf("Retransmitted UDP Packet: Src Port: %d, Dst Port: %d\n",
-            //     ntohs(udp_header->source), ntohs(udp_header->dest));
-            // }
-            
+
             int udp_header_length = sizeof(struct udphdr); // UDP header length is fixed
             int udp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + udp_header_length);
-            
             printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
             printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
 
             const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + udp_header_length;
             printf("UDP Payload starts at memory location: %p\n", payload);
-            // Apply filter
+
+            //check filter
             if (filter_expression) {
                 char *filter_port_str = strstr(filter_expression, "port ");
                 //printf("this is the filter port: %s\n", filter_port_str);
@@ -227,7 +201,6 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
                         printf("\n");
                         printf("Skipped packets with Src Port: %d, Dst Port: %d\n\n",
                         ntohs(udp_header->source), ntohs(udp_header->dest));
-                        
                         continue; // Skip packet if it doesn't match the port
                     }
                 }
@@ -256,6 +229,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
 
 void capture_pcap_file(const char *file_name, const char *filter_expression) {
     char errbuf[PCAP_ERRBUF_SIZE];
+	//start offline capture
     pcap_t *descr = pcap_open_offline(file_name, errbuf);
     if (descr == NULL) {
         fprintf(stderr, "pcap_open_offline() failed: %s\n", errbuf);
@@ -300,15 +274,14 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
             default:
                 printf("Other (protocol number: %d)\n", protocol);
         }
-
         printf("Packet %d: Source IP: %s, Destination IP: %s \n", ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
-        // Check transport layer protocol
         if (ip_header->ip_p == IPPROTO_TCP) {
             // TCP packet
             struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
 
-            if (is_retransmission(ntohl(tcp_header->seq))) {
+			//check retransmission
+            if (check_retransmission(ntohl(tcp_header->seq))) {
                 printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
                 ntohs(tcp_header->source), ntohs(tcp_header->dest));
             }
@@ -320,8 +293,8 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
     
             const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + tcp_header_length;
             printf("TCP Payload starts at memory location: %p\n", payload);
-            // Apply filter
-          
+
+            //check filter
             if (filter_expression) {
                 char *filter_port_str = strstr(filter_expression, "port ");
                 if (filter_port_str) {
@@ -341,22 +314,16 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
         } else if (ip_header->ip_p == IPPROTO_UDP) {
             // UDP packet
             struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
-            
-            // can't replicate the same method of udp (doesn't have the seq inside its struct)
-            // if (is_retransmission(ntohl(udp_header->seq))) {
-            //     printf("Retransmitted UDP Packet: Src Port: %d, Dst Port: %d\n",
-            //     ntohs(udp_header->source), ntohs(udp_header->dest));
-            // }
-            
-            int udp_header_length = sizeof(struct udphdr); // UDP header length is fixed
+
+            int udp_header_length = sizeof(struct udphdr); 
             int udp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + udp_header_length);
-            
             printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
             printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
 
             const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + udp_header_length;
             printf("UDP Payload starts at memory location: %p\n", payload);
-            // Apply filter
+
+            //check filter
             if (filter_expression) {
                 char *filter_port_str = strstr(filter_expression, "port ");
                 //printf("this is the filter port: %s\n", filter_port_str);
@@ -366,7 +333,6 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
                         printf("\n");
                         printf("Skipped packets with Src Port: %d, Dst Port: %d\n\n",
                         ntohs(udp_header->source), ntohs(udp_header->dest));
-                        
                         continue; // Skip packet if it doesn't match the port
                     }
                 }
@@ -393,6 +359,21 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
     pcap_close(descr);
 }
 
+
+//TESTING, NOT USED IN THE FINAL BUILD
+void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
+        packet)
+{
+    //this is for debugging only !
+    static int count = 1;
+    fprintf(stdout,"%d, ",count);
+    if(count == 4)
+        fprintf(stdout,"count == 4!!! ");
+    if(count == 7)
+        fprintf(stdout,"count == 7!! ");
+    fflush(stdout);
+    count++;
+}
 
 //not used in the final build
 void capture_packet(const char *dev){
@@ -468,7 +449,6 @@ void create_output_file(const char *filename) {
     fprintf(file, "Total UDP bytes: %d\n", total_udp_bytes);
     fprintf(file, "Captured %d TCP flows\n", tcp_flows);
     fprintf(file, "Captured %d UDP flows\n", udp_flows);
-
     fclose(file);
 }
 
@@ -499,22 +479,25 @@ int main(int argc, char *argv[]) {
         }
     }
 
+	//offline mode
     if (file_name != NULL) {
         capture_pcap_file(file_name, filter_expression);
         create_output_file("offline_output.txt");
-        printf("\n*** Final Stats ***");
-        printf("Total packets: %d", total_packets);
+        printf("\n*** Final Stats ***\n");
+        printf("Total packets: %d\n", total_packets);
         printf("Total TCP packets: %d\n", tcp_packets);
         printf("Total UDP packets: %d\n", udp_packets);
         printf("Total TCP bytes: %d\n", total_tcp_bytes);
         printf("Total UDP bytes: %d\n", total_udp_bytes);
         printf("Captured %d TCP flows\n", tcp_flows);
         printf("Captured %d UDP flows\n", udp_flows);
+	
+	//online mode
     } else if (dev != NULL) {
         capture_packet_with_filter(dev, filter_expression);
         create_output_file("online_output.txt");
-        printf("\n*** Final Stats ***");
-        printf("Total packets: %d", total_packets);
+        printf("\n*** Final Stats ***\n");
+        printf("Total packets: %d\n", total_packets);
         printf("Total TCP packets: %d\n", tcp_packets);
         printf("Total UDP packets: %d\n", udp_packets);
         printf("Total TCP bytes: %d\n", total_tcp_bytes);
@@ -525,6 +508,5 @@ int main(int argc, char *argv[]) {
         printf("No input source specified. Use -i for device or -r for pcap file.\n");
         return 1;
     }
-
     return 0;
 }
