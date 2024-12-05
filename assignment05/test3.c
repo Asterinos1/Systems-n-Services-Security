@@ -7,10 +7,10 @@
 #include <pcap/pcap.h>
 #include <pcap.h>
 #include <sys/types.h>
-#include <netinet/if_ether.h> /* includes net/ethernet.h */
-#include <netinet/ip.h> /* includes net/ethernet.h */
-#include <netinet/tcp.h> /* includes net/ethernet.h */
-#include <netinet/udp.h> /* includes net/ethernet.h */
+#include <netinet/if_ether.h> 
+#include <netinet/ip.h> 
+#include <netinet/tcp.h> 
+#include <netinet/udp.h> 
 #include <net/ethernet.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -548,16 +548,16 @@ int main(int argc, char *argv[]) {
     // Parsing command-line arguments
     while ((opt = getopt(argc, argv, "i:r:f:h")) != -1) {
         switch (opt) {
-            case 'i':
+            case 'i':  //online scan
                 dev = optarg;
                 break;
-            case 'r':
+            case 'r': //offline scan
                 file_name = optarg;
                 break;
-            case 'f':
+            case 'f': //filter parameter
                 filter_expression = optarg;
                 break;
-            case 'h':
+            case 'h': //help message
                 print_help();
                 return 0;
             default:
