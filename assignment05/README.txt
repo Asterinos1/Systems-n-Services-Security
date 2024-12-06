@@ -28,3 +28,10 @@ While in inside project's directory, run:
 Depending if we use online/offline mode, the corresponding output txt file will be created.
 
 Bibliography: https://www.tcpdump.org/manpages/pcap.3pcap.txt
+
+Regarding the theoretical questions on retransmissions for TCP/UDP packets:
+
+We can only if an incoming packet is a retransmission only for the TCP packets (as shown in the code of the tool).
+This is done because of the nature of the protocol (TCP) we can compare the sequence numbers of the packets and when we find an already sent
+sequence, we consider it a retransmission. However in UDP protocol we are very limited as there are no sequence numbers or any other information regarding the packet
+that can be utilized to check for retransmissions.
