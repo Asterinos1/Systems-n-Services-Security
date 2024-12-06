@@ -1,3 +1,4 @@
+
 #define __FAVOR_BSD
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,6 +96,96 @@ int check_retransmission(uint32_t seq_num) {
     return 0;
 }
 
+void tcp_info(const u_char * packet, int size){
+
+    const struct ip * ip_header = (struct ip *)(packet  + sizeof(struct ethhdr) );
+    size_t ip_header_length = ip_header->ip_hl * 4;
+
+    struct flow_comp new_flow;
+    uint8_t protocol = ip_header->ip_p;
+    new_flow.src_ip = ip_header->ip_src;
+    new_flow.dst_ip = ip_header->ip_dst;
+    new_flow.protocol = protocol;
+
+	struct ether_header *eptr = (struct ether_header*)packet;
+
+	if (ntohs(eptr->ether_type) != ETHERTYPE_IP && ntohs(eptr->ether_type) != ETHERTYPE_IPV6) {
+		printf("Not an IPv4 or IPv6 packet. Skipped\n");
+		return;
+	}
+
+            struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
+
+            new_flow.src_port = ntohs(tcp_header->source);
+            new_flow.dst_port = ntohs(tcp_header->dest);
+
+            if (add_flow(&new_flow)) {
+                tcp_flows++; // new TCP flow
+            }
+
+			//check retransmission
+            if (check_retransmission(ntohl(tcp_header->seq))) {
+                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
+                ntohs(tcp_header->source), ntohs(tcp_header->dest));
+            }
+
+            //calculate header and payload sizes of tcp
+            int tcp_header_length = tcp_header->doff * 4;
+            int tcp_payload_length = size-tcp_header_length;
+
+
+            printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+            printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
+    
+
+            const u_char *payload = packet + sizeof(struct ethhdr) + ip_header_length + tcp_header_length;
+            printf("TCP Payload starts at memory location: %p\n", payload);
+            
+            total_tcp_bytes += size;
+            tcp_packets++;
+}
+
+void udp_info(const u_char * packet, int size){
+
+    const struct ip * ip_header = (struct ip *)(packet  + sizeof(struct ethhdr) );
+    size_t ip_header_length = ip_header->ip_hl * 4;
+
+    struct flow_comp new_flow;
+    uint8_t protocol = ip_header->ip_p;
+    new_flow.src_ip = ip_header->ip_src;
+    new_flow.dst_ip = ip_header->ip_dst;
+    new_flow.protocol = protocol;
+
+	struct ether_header *eptr = (struct ether_header*)packet;
+
+	if (ntohs(eptr->ether_type) != ETHERTYPE_IP && ntohs(eptr->ether_type) != ETHERTYPE_IPV6) {
+		printf("Not an IPv4 or IPv6 packet. Skipped\n");
+		return;
+	}
+
+        // UDP packet
+            struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
+
+            //udp flow check
+            new_flow.src_port = ntohs(udp_header->source);
+            new_flow.dst_port = ntohs(udp_header->dest);
+
+            if (add_flow(&new_flow)) {
+                udp_flows++; // new UDP flow
+            }
+            
+            int udp_header_length = sizeof(struct udphdr);
+            int udp_payload_length = size+udp_header_length;
+            printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
+            printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
+
+            const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + udp_header_length;
+            printf("UDP Payload starts at memory location: %p\n", payload);
+
+            total_udp_bytes += size;
+            udp_packets++;
+}
+
 
 /*function to show the packets captured by pcap_open_live*/
 void capture_packet_with_filter(const char *dev, const char *filter_op) {
@@ -157,12 +248,13 @@ void capture_packet_with_filter(const char *dev, const char *filter_op) {
             }
         }
 
+/*
         //new for flows
         struct flow_comp new_flow;
         new_flow.src_ip = ip_header->ip_src;
         new_flow.dst_ip = ip_header->ip_dst;
         new_flow.protocol = protocol;
-
+*/
         printf("Protocol: ");
         switch (protocol){
             case IPPROTO_TCP:
@@ -178,62 +270,14 @@ void capture_packet_with_filter(const char *dev, const char *filter_op) {
                 printf("Other (protocol number: %d)\n",protocol);
         }
 
-        printf("\nPacket %d:\nSource IP: %s, Destination IP: %s \n",
-        ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
+        printf("\nPacket %d:\nSource IP: %s, Destination IP: %s \n",++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
+        int size = header->caplen;
         if (ip_header->ip_p == IPPROTO_TCP) {
-            struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
-
-            new_flow.src_port = ntohs(tcp_header->source);
-            new_flow.dst_port = ntohs(tcp_header->dest);
-
-            if (add_flow(&new_flow)) {
-                tcp_flows++; // new TCP flow
-            }
-
-			//check retransmission
-            if (check_retransmission(ntohl(tcp_header->seq))) {
-                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
-                ntohs(tcp_header->source), ntohs(tcp_header->dest));
-            }
-
-            //calculate header and payload sizes of tcp
-            int tcp_header_length = tcp_header->doff * 4;
-            int tcp_payload_length = header->len - (sizeof(struct ethhdr) + ip_header_length + tcp_header_length);
-
-            printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
-            printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
-    
-
-            const u_char *payload = packet + sizeof(struct ethhdr) + ip_header_length + tcp_header_length;
-            printf("TCP Payload starts at memory location: %p\n", payload);
-            
-            total_tcp_bytes += header->len;
-            tcp_packets++;
+            tcp_info(packet,size);
 
         } else if (ip_header->ip_p == IPPROTO_UDP) {
-            // UDP packet
-            struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
-
-            //udp flow check
-            new_flow.src_port = ntohs(udp_header->source);
-            new_flow.dst_port = ntohs(udp_header->dest);
-
-            if (add_flow(&new_flow)) {
-                udp_flows++; // new UDP flow
-            }
-
-            //same as tcp
-            int udp_header_length = sizeof(struct udphdr);
-            int udp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + udp_header_length);
-            printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
-            printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
-
-            const u_char *payload = packet + sizeof(struct ether_header) + ip_header_length + udp_header_length;
-            printf("UDP Payload starts at memory location: %p\n", payload);
-
-            total_udp_bytes += header->len;
-            udp_packets++;
+            udp_info(packet,size);
         }
         total_packets++;
 
@@ -249,6 +293,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_op) {
 
     pcap_close(descr);
 }
+
 
 /*This is for ofline capture! */
 void capture_pcap_file(const char *file_name, const char *filter_op) {
@@ -298,11 +343,13 @@ void capture_pcap_file(const char *file_name, const char *filter_op) {
             }
         }
 
+        /*
         //new for flows
         struct flow_comp new_flow;
         new_flow.src_ip = ip_header->ip_src;
         new_flow.dst_ip = ip_header->ip_dst;
         new_flow.protocol = protocol;
+        */
 
         printf("Protocol: ");
         switch (protocol) {
@@ -320,54 +367,11 @@ void capture_pcap_file(const char *file_name, const char *filter_op) {
         }
         printf("Packet %d: Source IP: %s, Destination IP: %s \n", ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
+        int size = header->caplen;
         if (ip_header->ip_p == IPPROTO_TCP) {
-            struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
-
-            //flow check 
-            new_flow.src_port = ntohs(tcp_header->source);
-            new_flow.dst_port = ntohs(tcp_header->dest);
-
-            if (add_flow(&new_flow)) {
-                tcp_flows++; // new TCP flow
-            }
-
-			//check retransmission
-            if (check_retransmission(ntohl(tcp_header->seq))) {
-                printf("Retransmitted TCP Packet: Src Port: %d, Dst Port: %d\n",
-                ntohs(tcp_header->source), ntohs(tcp_header->dest));
-            }
-
-            int tcp_header_length = tcp_header->doff * 4; // this is TCP header length in bytes
-            int tcp_payload_length = header->len - (sizeof(struct ethhdr) + ip_header_length + tcp_header_length);
-            printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
-            printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
-    
-            const u_char *payload = packet + sizeof(struct ethhdr) + ip_header_length + tcp_header_length;
-            printf("TCP Payload starts at memory location: %p\n", payload);
-
-            total_tcp_bytes += header->len;
-            tcp_packets++;
-
+            tcp_info(packet,size);
         } else if (ip_header->ip_p == IPPROTO_UDP) {
-            struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
-
-            new_flow.src_port = ntohs(udp_header->source);
-            new_flow.dst_port = ntohs(udp_header->dest);
-
-            if (add_flow(&new_flow)) {
-                udp_flows++; 
-            }
-
-            int udp_header_length = sizeof(struct udphdr); 
-            int udp_payload_length = header->len - (sizeof(struct ethhdr) + ip_header_length + udp_header_length);
-            printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
-            printf("UDP Header Length: %d bytes, UDP Payload Length: %d bytes\n", udp_header_length, udp_payload_length);
-
-            const u_char *payload = packet + sizeof(struct ethhdr) + ip_header_length + udp_header_length;
-            printf("UDP Payload starts at memory location: %p\n", payload);
-
-            total_udp_bytes += header->len;
-            udp_packets++;
+            udp_info(packet,size);
         }
         total_packets++;
 
