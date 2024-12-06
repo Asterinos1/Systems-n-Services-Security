@@ -95,23 +95,9 @@ int check_retransmission(uint32_t seq_num) {
     return 0;
 }
 
-//attributes of pcap_open_live
-  /* open the device for sniffing.
-
-       pcap_t *pcap_open_live(char *device,int snaplen, int prmisc,int to_ms,
-       char *ebuf)
-
-       snaplen - maximum size of packets to capture in bytes
-       promisc - set card in promiscuous mode?
-       to_ms   - time to wait for packets in miliseconds before read
-       times out
-       errbuf  - if something happens, place error string here
-
-    */
-
 
 /*function to show the packets captured by pcap_open_live*/
-void capture_packet_with_filter(const char *dev, const char *filter_expression) {
+void capture_packet_with_filter(const char *dev, const char *filter_op) {
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *descr;
     /*start online capture
@@ -123,7 +109,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
         fprintf(stderr, "pcap_open_live() failed: %s\n", errbuf);
         exit(EXIT_FAILURE);
     }
-    printf("Capturing packets on network interface %s with filter: %s\n", dev, filter_expression);
+    printf("Capturing packets on network interface %s with filter: %s\n", dev, filter_op);
 
     
     struct pcap_pkthdr *header; 
@@ -141,7 +127,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
 
         // we take the ip header and decode it
         /*IP adresses are 32-bits and the ip_hl is a 4-bit field
-        so to take the actual ip header we multiply by 4
+        so to take the actual ip header we multiply by 4 (to be in bytes)
         */
         const struct ip *ip_header = (struct ip *)(packet + sizeof(struct ethhdr));
         size_t ip_header_length = ip_header->ip_hl * 4;
@@ -150,10 +136,11 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
         uint8_t protocol = ip_header->ip_p;
 
         //if the user wrote a filter port then skip all the packets with other ports 
-        if (filter_expression && strlen(filter_expression) > 0) {
-            char *filter_port_str = strstr(filter_expression, "port ");
+        if (filter_op && strlen(filter_op) > 0) {
+            char *filter_port_str = strstr(filter_op, "port ");
             if (filter_port_str) {
-                int filter_port = atoi(filter_port_str + 5); //skip the 5 first leters to access the port 
+                //skip the 5 first leters to access the port 
+                int filter_port = atoi(filter_port_str + 5); 
                 if (protocol == IPPROTO_TCP) {
                     struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
                     if (ntohs(tcp_header->source) != filter_port && ntohs(tcp_header->dest) != filter_port) {
@@ -195,7 +182,6 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
         ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
         if (ip_header->ip_p == IPPROTO_TCP) {
-            // decode tcp header
             struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
 
             new_flow.src_port = ntohs(tcp_header->source);
@@ -211,11 +197,10 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
                 ntohs(tcp_header->source), ntohs(tcp_header->dest));
             }
 
-            //calculate header and payload sizes
+            //calculate header and payload sizes of tcp
             int tcp_header_length = tcp_header->doff * 4;
             int tcp_payload_length = header->len - (sizeof(struct ethhdr) + ip_header_length + tcp_header_length);
 
-            //print usefull information
             printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
             printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
     
@@ -238,6 +223,7 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
                 udp_flows++; // new UDP flow
             }
 
+            //same as tcp
             int udp_header_length = sizeof(struct udphdr);
             int udp_payload_length = header->len - (sizeof(struct ether_header) + ip_header_length + udp_header_length);
             printf("UDP Packet: Src Port: %d, Dst Port: %d\n", ntohs(udp_header->source), ntohs(udp_header->dest));
@@ -264,7 +250,8 @@ void capture_packet_with_filter(const char *dev, const char *filter_expression) 
     pcap_close(descr);
 }
 
-void capture_pcap_file(const char *file_name, const char *filter_expression) {
+/*This is for ofline capture! */
+void capture_pcap_file(const char *file_name, const char *filter_op) {
     char errbuf[PCAP_ERRBUF_SIZE];
 	//start offline capture
     pcap_t *descr = pcap_open_offline(file_name, errbuf);
@@ -273,13 +260,14 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
         exit(EXIT_FAILURE);
     }
 
-    printf("Processing pcap file: %s with filter: %s\n", file_name, filter_expression);
+    printf("Processing pcap file: %s with filter: %s\n", file_name, filter_op);
 
     struct pcap_pkthdr *header;
     const u_char *packet;
     int res;
     int packet_count = 0;
 
+    //same as before with the online capture
     while ((res = pcap_next_ex(descr, &header, &packet)) >= 0) {
         if (res == 0) {
             continue;
@@ -289,9 +277,9 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
         size_t ip_header_length = ip_header->ip_hl * 4;
         uint8_t protocol = ip_header->ip_p;
 
-                //if the user wrote a filter port then skip all the packets with other ports 
-        if (filter_expression && strlen(filter_expression) > 0) {
-            char *filter_port_str = strstr(filter_expression, "port ");
+        //if the user wrote a filter port then skip all the packets with other ports 
+        if (filter_op && strlen(filter_op) > 0) {
+            char *filter_port_str = strstr(filter_op, "port ");
             if (filter_port_str) {
                 int filter_port = atoi(filter_port_str + 5); //skip the 5 first leters to access the port 
                 if (protocol == IPPROTO_TCP) {
@@ -333,7 +321,6 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
         printf("Packet %d: Source IP: %s, Destination IP: %s \n", ++packet_count, inet_ntoa(ip_header->ip_src), inet_ntoa(ip_header->ip_dst));
 
         if (ip_header->ip_p == IPPROTO_TCP) {
-            // TCP packet
             struct tcphdr *tcp_header = (struct tcphdr *)((u_char *)ip_header + ip_header_length);
 
             //flow check 
@@ -341,7 +328,7 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
             new_flow.dst_port = ntohs(tcp_header->dest);
 
             if (add_flow(&new_flow)) {
-                tcp_flows++; // New TCP flow
+                tcp_flows++; // new TCP flow
             }
 
 			//check retransmission
@@ -350,7 +337,7 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
                 ntohs(tcp_header->source), ntohs(tcp_header->dest));
             }
 
-            int tcp_header_length = tcp_header->doff * 4; // TCP header length in bytes
+            int tcp_header_length = tcp_header->doff * 4; // this is TCP header length in bytes
             int tcp_payload_length = header->len - (sizeof(struct ethhdr) + ip_header_length + tcp_header_length);
             printf("TCP Packet: Src Port: %d, Dst Port: %d\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
             printf("TCP Header Length: %d bytes, TCP Payload Length: %d bytes\n", tcp_header_length, tcp_payload_length);
@@ -362,15 +349,13 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
             tcp_packets++;
 
         } else if (ip_header->ip_p == IPPROTO_UDP) {
-            // UDP packet
             struct udphdr *udp_header = (struct udphdr *)((u_char *)ip_header + ip_header_length);
 
-            //UDP flow check
             new_flow.src_port = ntohs(udp_header->source);
             new_flow.dst_port = ntohs(udp_header->dest);
 
             if (add_flow(&new_flow)) {
-                udp_flows++; // new UDP flow
+                udp_flows++; 
             }
 
             int udp_header_length = sizeof(struct udphdr); 
@@ -399,6 +384,7 @@ void capture_pcap_file(const char *file_name, const char *filter_expression) {
     pcap_close(descr);
 }
 
+/*ouput file creation*/
 void create_output_file(const char *filename) {
     FILE *file = fopen(filename, "w");
     if (file == NULL) {
@@ -417,12 +403,9 @@ void create_output_file(const char *filename) {
 }
 
 int main(int argc, char *argv[]) {
-    char *dev = NULL;
-    char *file_name = NULL;
-    char *filter_expression = NULL;
+    char *dev = NULL, *file_name = NULL, *filter_op = NULL;
     int opt;
 
-    // Parsing command-line arguments
     while ((opt = getopt(argc, argv, "i:r:f:h")) != -1) {
         switch (opt) {
             case 'i':
@@ -432,7 +415,7 @@ int main(int argc, char *argv[]) {
                 file_name = optarg;
                 break;
             case 'f':
-                filter_expression = optarg;
+                filter_op = optarg;
                 break;
             case 'h':
                 print_help();
@@ -445,7 +428,7 @@ int main(int argc, char *argv[]) {
 
 	//offline mode
     if (file_name != NULL) {
-        capture_pcap_file(file_name, filter_expression);
+        capture_pcap_file(file_name, filter_op);
         create_output_file("offline_output.txt");
         printf("\n*** Final Stats ***\n");
         printf("Total packets: %d\n", total_packets);
@@ -458,7 +441,7 @@ int main(int argc, char *argv[]) {
 	
 	//online mode
     } else if (dev != NULL) {
-        capture_packet_with_filter(dev, filter_expression);
+        capture_packet_with_filter(dev, filter_op);
         create_output_file("online_output.txt");
         printf("\n*** Final Stats ***\n");
         printf("Total packets: %d\n", total_packets);
