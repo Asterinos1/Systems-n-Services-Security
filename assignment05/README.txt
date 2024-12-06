@@ -26,3 +26,5 @@ While in inside project's directory, run:
 5) or instead visit any site.
 
 Depending if we use online/offline mode, the corresponding output txt file will be created.
+
+Bibliography: https://www.tcpdump.org/manpages/pcap.3pcap.txt
