@@ -9,3 +9,4 @@ Rep for the course "Systems and Services Security (2024-2025)" at ECE TUC.
 - Assignment 4 'Web-based Vulnerabilities & Attacks'
 - Assignment 5 'Network traffic monitoring using the Packet Capture library'
 - Assignment 6 'Iptables - Ip6tables'
+- Assignment 7 'soon'
