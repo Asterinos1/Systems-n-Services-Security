@@ -17,6 +17,8 @@ Options:
   -reset      Reset firewall rules to default (accept all)"
   -help       Display this help message"
 
+!! Warning: the tool will take some time to configure and to list the rules !!
+
 Example usage:
 
 sudo ./firewall.sh -config
@@ -25,3 +27,6 @@ sudo ./firewall.sh -list
 
 You can now attempt to access one of the domains inside the config.txt and the request
 should get denied saying it's blocked by the firewall.
+Currently the tool has a few issues regarding the blocking of certain domains in the config.txt using
+iptables/ip6tables as they can't be resolved (main issue) and the other issue being that after have configured the firewall,
+a few sites remain unblocked. 
