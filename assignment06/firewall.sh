@@ -1,11 +1,8 @@
 #!/bin/bash
-
-# File paths
 CONFIG_FILE="config.txt"
 RULES_V4="rulesV4"
 RULES_V6="rulesV6"
 
-# Function to display help
 function display_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -18,7 +15,9 @@ function display_help() {
     echo "  -help     Display this help message and exit"
 }
 
-# Function to check if the given value is a valid IPv4 address
+#We check for valid ips by checking their structures and the characters
+#they contain. Ipv4s are simpler than ipv6s so more characters are used.
+#These functions are needed during configuration.
 function is_valid_ipv4() {
     local ip=$1
     if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
@@ -28,7 +27,6 @@ function is_valid_ipv4() {
     fi
 }
 
-# Function to check if the given value is a valid IPv6 address
 function is_valid_ipv6() {
     local ip=$1
     if [[ $ip =~ ^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$ ]]; then
@@ -38,15 +36,15 @@ function is_valid_ipv6() {
     fi
 }
 
-# Function to configure iptables/ip6tables rules
+#We read all domains in the config.txt and using iptables commands we reject them
+#both ipv4s and ipv6s using the corresponding iptables/ip6tables commands.
+#This is one of the slower parts.
 function configure_rules() {
     echo "Configuring rules based on $CONFIG_FILE..."
-    # Read domains from config.txt and resolve to IP addresses
     while read -r domain; do
         if [[ -n "$domain" ]]; then
             echo "Blocking domain: $domain"
             
-            # Resolve IPv4 addresses
             for ip in $(dig +short A "$domain"); do
                 if is_valid_ipv4 "$ip"; then
                     echo "Blocking IPv4: $ip"
@@ -56,7 +54,6 @@ function configure_rules() {
                 fi
             done
 
-            # Resolve IPv6 addresses
             for ip6 in $(dig +short AAAA "$domain"); do
                 if is_valid_ipv6 "$ip6"; then
                     echo "Blocking IPv6: $ip6"
@@ -69,7 +66,9 @@ function configure_rules() {
     done < "$CONFIG_FILE"
 }
 
-# Function to save rules
+#the functions below are self-explenatory
+#they use the iptables/ip6tables to handle 
+#-save, -load, -list, -reset
 function save_rules() {
     echo "Saving rules to $RULES_V4 and $RULES_V6..."
     sudo iptables-save > "$RULES_V4"
@@ -77,7 +76,6 @@ function save_rules() {
     echo "Rules saved."
 }
 
-# Function to load rules
 function load_rules() {
     echo "Loading rules from $RULES_V4 and $RULES_V6..."
     sudo iptables-restore < "$RULES_V4"
@@ -85,7 +83,7 @@ function load_rules() {
     echo "Rules loaded."
 }
 
-# Function to list current rules
+#One of the slower parts as well
 function list_rules() {
     echo "Listing current IPv4 rules:"
     sudo iptables -L
@@ -94,7 +92,6 @@ function list_rules() {
     sudo ip6tables -L
 }
 
-# Function to reset rules to default (accept all)
 function reset_rules() {
     echo "Resetting all rules to default (accept all)..."
     sudo iptables -F
@@ -102,13 +99,11 @@ function reset_rules() {
     echo "All rules have been reset to default (accept all)."
 }
 
-# Check for command-line arguments
 if [[ "$#" -eq 0 ]]; then
     display_help
     exit 1
 fi
 
-# Parse command-line arguments
 case "$1" in
     -config)
         configure_rules
