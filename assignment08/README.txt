@@ -11,6 +11,7 @@ In terminal, we run:
 1) gdb ./Greeter
 2) disas readString
 
+We use disas to display the machine code instructions
 Now we get as output: 
 
    0x08049d95 <+0>:     endbr32
