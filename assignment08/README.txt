@@ -44,3 +44,6 @@ Confirm it works:
 
 What is your name?
 Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  , your grade is 9. Have a nice day.
+
+
+*** PART 2 - SPAWNNING THE TERMNIAL ***
