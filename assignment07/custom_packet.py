@@ -2,8 +2,9 @@ from scapy.all import *
 from datetime import datetime
 import base64
 
+#function to make the student packet
 def make_student_packet():
-    source_ip = "192.0.2.1" #na einai random meta
+    source_ip = "192.0.2.1" 
     dest_ip = "192.168.1.1"
     dest_port = 54321
 
@@ -16,7 +17,7 @@ def make_student_packet():
     print("Student packet created!")
     return packet
     
-
+#function to make 10 packets for port scan
 def make_port_scan_packets(protocol_input, random_IP, name, student_ID):
     dest_port = 0
     dest_IP = "192.168.1.2"
@@ -45,7 +46,7 @@ def make_port_scan_packets(protocol_input, random_IP, name, student_ID):
             dest_port = 0
     
     if dest_port == 0:
-        print("Invalid protocol.")
+        print("Invalid protocol!")
         return
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -54,6 +55,7 @@ def make_port_scan_packets(protocol_input, random_IP, name, student_ID):
     print(f"Packet for port scan with protocol {protocol_input} created!")
     return packet
 
+#a malicious packet with base64 encoding
 def make_base64_packet(random_IP, student_ID):
     dest_ip = "192.168.1.3"
     dest_port = 8080
@@ -64,6 +66,7 @@ def make_base64_packet(random_IP, student_ID):
     print("Packet with base64 created!")
     return packet
 
+#function to encode in base64 and return the encoded output as a string 
 def encode_in_base64(input_string):
     encoded_bytes = base64.b64encode(input_string.encode('utf-8'))
     encoded_str = encoded_bytes.decode('utf-8')
@@ -78,7 +81,7 @@ def make_dns_packet(random_IP, domain):
     print(f"DNS packet for {domain} created!")
     return packet
 
-#ICMP Ping Test Packet
+#function for ICMP Packet
 def make_icmp_packet(random_IP):
     dest_ip = "192.168.1.4"
     payload = "PingTest-2024"
@@ -87,8 +90,7 @@ def make_icmp_packet(random_IP):
     print("ICMP Ping packet created!")
     return packet
 
-# Test the function
-source_ip = "192.0.2.2" #balto random meta
+source_ip = "192.0.2.2"
 packets=[]
 protocols=["HTTP", "HTTPS","SSH", "TELNET", "FTP","DNS","RTSP","SQL","RDP","MQTT"]
 
@@ -97,7 +99,7 @@ protocols=["HTTP", "HTTPS","SSH", "TELNET", "FTP","DNS","RTSP","SQL","RDP","MQTT
 packets.append(make_student_packet())
 
 for protocol in protocols:
-    packets.append(make_port_scan_packets(protocol, source_ip, "faye", "00888"))
+    packets.append(make_port_scan_packets(protocol, source_ip, "Asterinos", "00107"))
 
 for i in range(5):
     packets.append(make_base64_packet(f"192.0.3.{i}",f"123456789{i}"))
@@ -105,4 +107,4 @@ for i in range(5):
 packets.append(make_dns_packet("192.0.4.1", "malicious.example.com"))
 packets.append(make_icmp_packet("192.0.5.1"))
 
-wrpcap("student_packet.pcap", packets)
+wrpcap("custom_packet.pcap", packets)
