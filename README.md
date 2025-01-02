@@ -10,3 +10,4 @@ Rep for the course "Systems and Services Security (2024-2025)" at ECE TUC.
 - Assignment 5 'Network traffic monitoring using the Packet Capture library'
 - Assignment 6 'Iptables/Ip6tables Firewall'
 - Assignment 7 'Network traffic monitoring using the Snort intrusion detection system'
+- Assignment 8 'Buffer overflow exploitation'
