@@ -7,10 +7,8 @@
 
 //Elliptic Curve Diffie-Hellman (ECDH) Key Exchange
 
-// setting key size.
 #define KEY_SIZE 32 
 
-// display the help message
 void print_help() {
     printf("Command Line Options for ECDH Tool:\n");
     printf("\t-o path      Path to output file\n");
@@ -19,7 +17,7 @@ void print_help() {
     printf("\t-h           This help message\n");
 }
 
-// Function to write keys and shared secret to the output file
+//function to write keys and shared secret to the output file
 void create_file(const char *filename, const unsigned char *alice_pub, const unsigned char *bob_pub,
                   const unsigned char *shared_secret) {
     FILE *file = fopen(filename, "w");
@@ -68,8 +66,7 @@ int main(int argc, char *argv[]) {
     unsigned char bob_public[KEY_SIZE];
     unsigned char shared_secret[KEY_SIZE];
 
-    // For debugging purposes.
-    // Initialising the sodium lib.
+    //for debugging purposes.
     if (sodium_init() < 0) {
         printf("Failed to initialize libsodium.\n");
         return 1;
@@ -77,7 +74,6 @@ int main(int argc, char *argv[]) {
         printf("\n**DEBUG**\nLibsodium initialised.\n");
     }
 
-    // Parsing command-line arguments using getopt
     while ((opt = getopt(argc, argv, "o:a:b:h")) != -1) {
         switch (opt) {
             case 'o':
